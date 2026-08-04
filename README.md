@@ -339,7 +339,9 @@ npm run dev
 ---
 
 ## Author
-
+**Om Narkar**
+Email: narkarom24@gmail.com
+&
 **Shahiduddin**
 Email: shahiduddin153@gmail.com
 
