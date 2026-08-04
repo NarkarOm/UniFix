@@ -1,21 +1,19 @@
 import { X, Eye, CheckCheck, Zap, Droplets, Hammer, Sparkles, Monitor, Shield, Bath, FileText } from 'lucide-react'
+import { useTheme } from '../theme/ThemeProvider'
 import { CATEGORY, STATUS, COMPLAINT_FLOW } from '../constants'
 import { formatDate, formatDateShort, cap } from '../utils/dateUtils'
-import { StatusBadge, SectionHeader } from '../components/SharedComponents'
+import { StatusBadge, SectionHeader, TabBar } from '../components/SharedComponents'
 
 const CATEGORY_ICONS = {
-  electrical: Zap,
-  plumbing: Droplets,
-  carpentry: Hammer,
-  cleaning: Sparkles,
-  technician: Monitor,
-  safety: Shield,
-  washroom: Bath,
-  others: FileText,
+  electrical: Zap, plumbing: Droplets, carpentry: Hammer,
+  cleaning: Sparkles, technician: Monitor, safety: Shield,
+  washroom: Bath, others: FileText,
 }
 
 export function ComplaintsSection({ allComplaints, visible, activeTab, onTabChange, cs, loading, focused, setFocused }) {
+  const { tokens } = useTheme()
   const flaggedCount = allComplaints.filter(c => c.flagged && !c.flagResolved && ['pending', 'assigned', 'in_progress'].includes(c.status)).length
+
   const tabs = [
     { key: 'all', label: 'All', count: cs.total ?? allComplaints.length },
     { key: 'flagged', label: 'Flagged', count: flaggedCount },
@@ -25,68 +23,127 @@ export function ComplaintsSection({ allComplaints, visible, activeTab, onTabChan
     { key: 'completed', label: 'Completed', count: cs.completed },
     { key: 'rejected', label: 'Rejected', count: cs.rejected },
   ]
+
   return (
     <div>
       <SectionHeader title="Complaint Management" subtitle="Full complaint history and real-time status tracking" />
-      <div className="bg-white rounded-[16px] border border-[#f0f0f0] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-        <div className="flex gap-[5px] p-[14px_18px] border-b border-[#f5f5f5] flex-wrap">
-          {tabs.map(tab => (
-            <button key={tab.key} className={`p-[6px_11px] rounded-[7px] border-[1.5px] text-[12px] font-semibold cursor-pointer transition-all duration-150 ${activeTab === tab.key ? 'bg-[#0f172a] text-white border-[#0f172a]' : 'bg-white text-[#64748b] border-[#e2e8f0] hover:border-[#0f172a]'}`} onClick={() => onTabChange(tab.key)}>
-              {tab.label}
-              <span className={`ml-[5px] text-[10px] font-extrabold px-[6px] py-[1px] rounded-[20px] ${activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-[#f1f5f9] text-[#64748b]'}`}>{tab.count ?? 0}</span>
-            </button>
-          ))}
+      <div style={{
+        background: tokens.surface, borderRadius: tokens.radius.xxl,
+        border: `1px solid ${tokens.border}`, overflow: 'hidden', boxShadow: tokens.shadow,
+      }}>
+        <div style={{ padding: '14px 18px', borderBottom: `1px solid ${tokens.border}` }}>
+          <TabBar tabs={tabs} active={activeTab} onChange={onTabChange} />
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead><tr className="bg-[#fafafa]">{['', 'Complaint', 'Category', 'Location', 'Reported By', 'Status', 'Date', ''].map((h, i) => <th key={i} className="p-[10px_20px] text-left text-[10px] font-bold text-[#94a3b8] tracking-[0.6px] uppercase border-b border-[#f0f0f0] whitespace-nowrap">{h}</th>)}</tr></thead>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: tokens.tableHeadBg }}>
+                {['', 'Complaint', 'Category', 'Location', 'Reported By', 'Status', 'Date', ''].map((h, i) => (
+                  <th key={i} style={{
+                    padding: '10px 16px', textAlign: 'left', fontSize: 11,
+                    fontWeight: 700, color: tokens.textMuted, letterSpacing: '0.05em',
+                    textTransform: 'uppercase', borderBottom: `1px solid ${tokens.border}`, whiteSpace: 'nowrap',
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} className="p-[60px] text-center text-[#94a3b8] text-[14px]">Loading…</td></tr>
-                : visible.length === 0 ? <tr><td colSpan={8} className="p-[60px] text-center text-[#94a3b8] text-[14px]">No complaints found</td></tr>
-                  : visible.map(c => {
-                    const catMeta = CATEGORY[c.category] ?? CATEGORY.others
-                    const CatIcon = CATEGORY_ICONS[c.category] ?? CATEGORY_ICONS.others
-                    return (
-                     <tr key={c.id} className={`transition-colors duration-100 cursor-pointer hover:bg-[#fafafa] ${c.flagged && !c.flagResolved && ['pending','assigned','in_progress'].includes(c.status) ? 'bg-[#fff8f8] border-l-[3px] border-l-[#dc2626]' : ''}`}>
-                        <td className="p-[11px_8px_11px_18px] border-b border-[#f9f9f9] align-middle">
-                          <div className="w-[36px] h-[36px] rounded-[9px] bg-[#f3f4f6] overflow-hidden flex items-center justify-center shrink-0">
-                            {c.photoUrl ? <img src={c.photoUrl} className="w-full h-full object-cover" alt="" /> : <CatIcon size={16} color={catMeta.color} />}
-                          </div>
-                        </td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle">
-                          <div className="text-[13px] font-bold text-[#0f172a] mb-[2px]">{c.subIssue || c.customIssue || 'Issue Reported'}</div>
-                          <div className="font-['DM_Mono'] text-[11px] text-[#94a3b8]">{c.ticketId}</div>
-                        </td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle text-[12px] font-bold" style={{ color: catMeta.color }}>{cap(c.category)}</td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle">
-                          <div className="text-[12px] text-[#374151]">{c.building || '—'}</div>
-                          <div className="text-[11px] text-[#94a3b8]">{c.roomDetail}</div>
-                        </td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle">
-                          <div className="text-[12px] font-semibold text-[#374151]">{c.submittedByName || '—'}</div>
-                          <div className="text-[11px] text-[#94a3b8]">{cap(c.submittedByRole)}</div>
-                        </td>
-                      <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle">
-                          <StatusBadge status={c.status} />
-                          {c.flagged && !c.flagResolved && ['pending','assigned','in_progress'].includes(c.status) && (
-                            <span className="inline-flex items-center gap-[3px] mt-[4px] text-[10px] font-bold px-[7px] py-[2px] rounded-[20px] bg-[#fef2f2] text-[#dc2626] border border-[#fecaca]">🚩 FLAGGED</span>
-                          )}
-                          {c.hodEmailSent && (
-                            <span className="inline-flex items-center gap-[3px] mt-[4px] text-[10px] font-bold px-[7px] py-[2px] rounded-[20px] bg-[#fffbeb] text-[#d97706] border border-[#fde68a] ml-[4px]">✉ HOD</span>
-                          )}
-                        </td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle"><span className="text-[11px] text-[#94a3b8]">{formatDateShort(c.createdAt)}</span></td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle">
-                          <button className="bg-[#16a34a] text-white p-[5px_13px] rounded-[6px] border-none text-[12px] font-bold cursor-pointer transition-all duration-150 flex items-center gap-[4px] hover:bg-[#15803d]" onClick={() => setFocused(c)}><Eye size={12} /> View</button>
-                        </td>
-                      </tr>
-                    )
-                  })}
+              {loading ? (
+                <tr><td colSpan={8} style={{ padding: 60, textAlign: 'center', color: tokens.textMuted, fontSize: 14 }}>Loading…</td></tr>
+              ) : visible.length === 0 ? (
+                <tr><td colSpan={8} style={{ padding: 60, textAlign: 'center', color: tokens.textMuted, fontSize: 14 }}>No complaints found</td></tr>
+              ) : visible.map(c => {
+                const catMeta = CATEGORY[c.category] ?? CATEGORY.others
+                const CatIcon = CATEGORY_ICONS[c.category] ?? CATEGORY_ICONS.others
+                const isFlagged = c.flagged && !c.flagResolved && ['pending', 'assigned', 'in_progress'].includes(c.status)
+                return (
+                  <tr key={c.id}
+                    style={{
+                      transition: 'background 0.1s', cursor: 'pointer',
+                      background: isFlagged ? tokens.dangerBg : 'transparent',
+                      borderLeft: isFlagged ? `3px solid ${tokens.danger}` : '3px solid transparent',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = isFlagged ? tokens.dangerBg : tokens.tableRowHover}
+                    onMouseLeave={e => e.currentTarget.style.background = isFlagged ? tokens.dangerBg : 'transparent'}
+                  >
+                    <td style={{ padding: '10px 8px 10px 16px', borderBottom: `1px solid ${tokens.border}` }}>
+                      <div style={{
+                        width: 34, height: 34, borderRadius: tokens.radius.lg,
+                        background: tokens.surfaceHigh, overflow: 'hidden',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        {c.photoUrl
+                          ? <img src={c.photoUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+                          : <CatIcon size={15} color={catMeta.color} />
+                        }
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 16px', borderBottom: `1px solid ${tokens.border}` }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: tokens.text, marginBottom: 2 }}>{c.subIssue || c.customIssue || 'Issue Reported'}</div>
+                      <div style={{ fontSize: 11, color: tokens.textMuted, fontFamily: 'monospace' }}>{c.ticketId}</div>
+                    </td>
+                    <td style={{ padding: '12px 16px', borderBottom: `1px solid ${tokens.border}`, fontSize: 12, fontWeight: 700, color: catMeta.color }}>
+                      {cap(c.category)}
+                    </td>
+                    <td style={{ padding: '12px 16px', borderBottom: `1px solid ${tokens.border}` }}>
+                      <div style={{ fontSize: 12, color: tokens.textSecondary }}>{c.building || '—'}</div>
+                      <div style={{ fontSize: 11, color: tokens.textMuted }}>{c.roomDetail}</div>
+                    </td>
+                    <td style={{ padding: '12px 16px', borderBottom: `1px solid ${tokens.border}` }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textSecondary }}>{c.submittedByName || '—'}</div>
+                      <div style={{ fontSize: 11, color: tokens.textMuted }}>{cap(c.submittedByRole)}</div>
+                    </td>
+                    <td style={{ padding: '12px 16px', borderBottom: `1px solid ${tokens.border}` }}>
+                      <StatusBadge status={c.status} />
+                      {isFlagged && (
+                        <div style={{ marginTop: 4 }}>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            fontSize: 10, fontWeight: 700, padding: '2px 7px',
+                            borderRadius: tokens.radius.pill,
+                            background: tokens.dangerBg, color: tokens.danger,
+                            border: `1px solid ${tokens.dangerBorder}`,
+                          }}>FLAGGED</span>
+                        </div>
+                      )}
+                      {c.hodEmailSent && (
+                        <div style={{ marginTop: 4 }}>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            fontSize: 10, fontWeight: 700, padding: '2px 7px',
+                            borderRadius: tokens.radius.pill,
+                            background: tokens.warningBg, color: tokens.warning,
+                            border: `1px solid ${tokens.warningBorder}`,
+                          }}>HOD</span>
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 16px', borderBottom: `1px solid ${tokens.border}`, fontSize: 11, color: tokens.textMuted }}>{formatDateShort(c.createdAt)}</td>
+                    <td style={{ padding: '12px 16px', borderBottom: `1px solid ${tokens.border}` }}>
+                      <button
+                        onClick={() => setFocused(c)}
+                        style={{
+                          background: tokens.success, color: '#fff',
+                          padding: '5px 12px', borderRadius: tokens.radius.md,
+                          border: 'none', fontSize: 12, fontWeight: 600,
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        <Eye size={12} /> View
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
-        <div className="p-[11px_20px] border-t border-[#f5f5f5] flex justify-between items-center">
-          <span className="text-[12px] text-[#94a3b8]">Showing {visible.length} of {allComplaints.length} entries</span>
+        <div style={{
+          padding: '10px 18px', borderTop: `1px solid ${tokens.border}`,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span style={{ fontSize: 12, color: tokens.textMuted }}>Showing {visible.length} of {allComplaints.length} entries</span>
         </div>
       </div>
       {focused && <ComplaintModal complaint={focused} onClose={() => setFocused(null)} />}
@@ -95,60 +152,150 @@ export function ComplaintsSection({ allComplaints, visible, activeTab, onTabChan
 }
 
 export function ComplaintModal({ complaint, onClose }) {
+  const { tokens } = useTheme()
   const catMeta = CATEGORY[complaint.category] ?? CATEGORY.others
   const CatIcon = CATEGORY_ICONS[complaint.category] ?? CATEGORY_ICONS.others
   const stepIndex = COMPLAINT_FLOW.indexOf(complaint.status)
+
   return (
-    <div className="fixed inset-0 bg-[#0f172a]/60 flex items-center justify-center z-[200] p-[20px] backdrop-blur-[2px]" onClick={onClose}>
-      <div className="bg-white rounded-[20px] w-full max-w-[720px] max-h-[90vh] flex flex-col shadow-[0_30px_80px_rgba(0,0,0,0.22)] overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center p-[18px_22px] border-b border-[#f3f4f6] shrink-0">
-          <div className="flex items-center gap-[12px]">
-            <div className="flex items-center justify-center w-[42px] h-[42px] rounded-[11px]" style={{ background: catMeta.bg }}><CatIcon size={20} color={catMeta.color} /></div>
+    <div
+      style={{
+        position: 'fixed', inset: 0, background: tokens.modalOverlay,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 200, padding: 20, backdropFilter: 'blur(2px)',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: tokens.surface, borderRadius: tokens.radius.xxl,
+          width: '100%', maxWidth: 720, maxHeight: '90vh',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: tokens.shadowModal, border: `1px solid ${tokens.border}`,
+          overflow: 'hidden',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '16px 20px', borderBottom: `1px solid ${tokens.border}`, flexShrink: 0,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 42, height: 42, borderRadius: tokens.radius.lg,
+              background: catMeta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <CatIcon size={20} color={catMeta.color} />
+            </div>
             <div>
-              <div className="text-[15px] font-extrabold text-[#0f172a]">{complaint.subIssue || complaint.customIssue || 'Issue Reported'}</div>
-              <div className="font-['DM_Mono'] text-[11px] text-[#94a3b8] mt-[3px]">{complaint.ticketId}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: tokens.text }}>{complaint.subIssue || complaint.customIssue || 'Issue Reported'}</div>
+              <div style={{ fontSize: 11, color: tokens.textMuted, fontFamily: 'monospace', marginTop: 2 }}>{complaint.ticketId}</div>
             </div>
           </div>
-          <div className="flex gap-[10px] items-center">
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <StatusBadge status={complaint.status} />
-            <button className="w-[32px] h-[32px] rounded-[8px] bg-[#f3f4f6] border-none cursor-pointer flex items-center justify-center text-[#374151] transition-all duration-150 hover:bg-[#fee2e2] hover:text-[#dc2626]" onClick={onClose}><X size={14} /></button>
+            <button
+              onClick={onClose}
+              style={{
+                width: 32, height: 32, borderRadius: tokens.radius.md,
+                background: tokens.surfaceHigh, border: `1px solid ${tokens.border}`,
+                cursor: 'pointer', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', color: tokens.textSecondary,
+              }}
+            >
+              <X size={14} />
+            </button>
           </div>
         </div>
-        <div className="overflow-y-auto p-[22px] flex flex-col gap-[18px]">
+
+        <div style={{ overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
           {complaint.status !== 'rejected' && (
-            <div className="bg-[#f9fafb] rounded-[12px] p-[18px]">
-              <div className="text-[10px] font-bold text-[#94a3b8] tracking-[0.6px] uppercase mb-[16px]">Progress</div>
-              <div className="flex items-start">
+            <div style={{ background: tokens.surfaceLow, borderRadius: tokens.radius.xl, padding: 18, border: `1px solid ${tokens.border}` }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: tokens.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 16 }}>Progress</div>
+              <div style={{ display: 'flex', alignItems: 'flex-start' }}>
                 {COMPLAINT_FLOW.map((step, i) => {
                   const done = i <= stepIndex
                   return (
-                    <div key={step} className="flex-1 flex flex-col items-center relative">
-                      <div className={`w-[26px] h-[26px] rounded-full flex items-center justify-center z-[1] mb-[8px] transition-colors duration-200 ${done ? 'bg-[#0f172a]' : 'bg-[#e2e8f0]'}`}>{done && <CheckCheck size={11} color="#fff" strokeWidth={3} />}</div>
-                      {i < COMPLAINT_FLOW.length - 1 && <div className={`absolute top-[13px] left-[50%] w-full h-[2px] z-[0] transition-colors duration-200 ${i < stepIndex ? 'bg-[#0f172a]' : 'bg-[#e2e8f0]'}`} />}
-                      <div className={`text-[10px] text-center font-medium ${done ? 'text-[#0f172a] font-bold' : 'text-[#94a3b8]'}`}>{STATUS[step]?.label}</div>
+                    <div key={step} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }}>
+                      <div style={{
+                        width: 26, height: 26, borderRadius: '50%', zIndex: 1, marginBottom: 8,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: done ? tokens.primary : tokens.surfaceHigh,
+                        border: `2px solid ${done ? tokens.primary : tokens.border}`,
+                        transition: 'all 0.2s',
+                      }}>
+                        {done && <CheckCheck size={11} color="#fff" strokeWidth={3} />}
+                      </div>
+                      {i < COMPLAINT_FLOW.length - 1 && (
+                        <div style={{
+                          position: 'absolute', top: 13, left: '50%', width: '100%', height: 2, zIndex: 0,
+                          background: i < stepIndex ? tokens.primary : tokens.border,
+                          transition: 'background 0.2s',
+                        }} />
+                      )}
+                      <div style={{ fontSize: 10, textAlign: 'center', fontWeight: done ? 700 : 500, color: done ? tokens.text : tokens.textMuted }}>
+                        {STATUS[step]?.label}
+                      </div>
                     </div>
                   )
                 })}
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-[14px]">
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14 }}>
             {[
-              { title: 'Complaint Details', rows: [['Category', cap(complaint.category)], ['Issue', complaint.subIssue || complaint.customIssue], ...(complaint.description ? [['Description', complaint.description]] : []), ['Building', complaint.building], ['Room / Area', complaint.roomDetail], ['Submitted', formatDate(complaint.createdAt)]] },
-              { title: 'Reported By', rows: [['Name', complaint.submittedByName], ['Email', complaint.submittedByEmail], ['Phone', complaint.submittedByPhone || '—'], ['Role', cap(complaint.submittedByRole)]] },
-              { title: 'Assignment', rows: [['Assigned To', complaint.assignedToName || 'Not yet assigned']] },
+              {
+                title: 'Complaint Details',
+                rows: [
+                  ['Category', cap(complaint.category)],
+                  ['Issue', complaint.subIssue || complaint.customIssue],
+                  ...(complaint.description ? [['Description', complaint.description]] : []),
+                  ['Building', complaint.building],
+                  ['Room / Area', complaint.roomDetail],
+                  ['Submitted', formatDate(complaint.createdAt)],
+                ],
+              },
+              {
+                title: 'Reported By',
+                rows: [
+                  ['Name', complaint.submittedByName],
+                  ['Email', complaint.submittedByEmail],
+                  ['Phone', complaint.submittedByPhone || '—'],
+                  ['Role', cap(complaint.submittedByRole)],
+                ],
+              },
+              {
+                title: 'Assignment',
+                rows: [['Assigned To', complaint.assignedToName || 'Not yet assigned']],
+              },
             ].map(panel => (
-              <div key={panel.title} className="bg-[#f9fafb] rounded-[12px] p-[15px]">
-                <div className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-[0.6px] mb-[12px]">{panel.title}</div>
-                <div className="flex flex-col gap-[8px]">
-{panel.rows.map(([k, v]) => <div key={k} className="flex justify-between gap-[8px]"><span className="text-[12px] text-[#94a3b8] font-medium shrink-0">{k}</span><span className="text-[12px] text-[#374151] font-semibold text-right break-all min-w-0">{v || '—'}</span></div>)}                </div>
+              <div key={panel.title} style={{ background: tokens.surfaceLow, borderRadius: tokens.radius.xl, padding: 15, border: `1px solid ${tokens.border}` }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>{panel.title}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {panel.rows.map(([k, v]) => (
+                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 12, color: tokens.textMuted, fontWeight: 500, flexShrink: 0 }}>{k}</span>
+                      <span style={{ fontSize: 12, color: tokens.textSecondary, fontWeight: 600, textAlign: 'right', wordBreak: 'break-all', minWidth: 0 }}>{v || '—'}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
+
           {complaint.photoUrl && (
             <div>
-              <div className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-[0.6px] mb-[10px]">Attached Photo</div>
-              <img src={complaint.photoUrl} alt="complaint" onClick={() => window.open(complaint.photoUrl, '_blank')} className="w-full max-h-[280px] object-cover rounded-[10px] cursor-pointer border border-[#f0f0f0] block" />
+              <div style={{ fontSize: 10, fontWeight: 700, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>Attached Photo</div>
+              <img
+                src={complaint.photoUrl} alt="complaint"
+                onClick={() => window.open(complaint.photoUrl, '_blank')}
+                style={{
+                  width: '100%', maxHeight: 280, objectFit: 'cover',
+                  borderRadius: tokens.radius.xl, cursor: 'pointer',
+                  border: `1px solid ${tokens.border}`, display: 'block',
+                }}
+              />
             </div>
           )}
         </div>

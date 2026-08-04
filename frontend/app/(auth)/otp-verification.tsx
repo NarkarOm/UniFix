@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { signInWithCustomToken } from "firebase/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,7 +10,7 @@ import {
   Text, TextInput, TouchableOpacity,
   View,
 } from "react-native";
-import { auth } from "../../firebase/firebaseConfig";
+
 import { authAPI } from "../../services/api";
 
 export default function OTPVerificationScreen() {
@@ -56,8 +56,9 @@ export default function OTPVerificationScreen() {
     setLoading(true);
     try {
       if (type === "email-verification") {
-        const data = await authAPI.verifyOtp(email, code, fullName, password, role);
-        await signInWithCustomToken(auth, data.token);
+   const data = await authAPI.verifyOtp(email, code, fullName, password, role);
+        await AsyncStorage.setItem("unifix_access_token", data.token);
+        await AsyncStorage.setItem("unifix_refresh_token", data.refreshToken);
         router.replace("/complete-profile");
       } else if (type === "password-reset") {
         await authAPI.validateResetOtp(email, code);

@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,7 +22,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { auth, db } from "../../firebase/firebaseConfig";
+
 import { authAPI } from "../../services/api";
 
 
@@ -147,12 +147,10 @@ export default function StaffProfileScreen() {
     [toastAnim],
   );
 
-  useEffect(() => {
-    const u = auth.currentUser;
-    if (!u) return;
-    getDoc(doc(db, "users", u.uid)).then((snap) => {
-      if (snap.exists()) setStaffData(snap.data() as StaffData);
-    });
+useEffect(() => {
+    authAPI.myProfile().then((res) => {
+      if (res?.profile) setStaffData(res.profile as any);
+    }).catch(() => {});
   }, []);
 
   const handlePickPhoto = useCallback(async () => {
@@ -167,12 +165,15 @@ export default function StaffProfileScreen() {
       });
       if (result.canceled) return;
       setPhotoUploading(true);
-      const url = await uploadToCloudinary(result.assets[0].uri, "unifix/profiles");
-      const u = auth.currentUser;
-      if (u) {
-        await updateDoc(doc(db, "users", u.uid), { photoUrl: url });
-        setStaffData((prev) => (prev ? { ...prev, photoUrl: url } : prev));
-      }
+const url = await uploadToCloudinary(result.assets[0].uri, "unifix/profiles");
+      await authAPI.updateProfile(staffData?.fullName || "", staffData?.phone || "");
+      const token = await AsyncStorage.getItem("unifix_access_token");
+      await fetch(`${process.env.EXPO_PUBLIC_BASE_URL}/auth/complete-profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ photoUrl: url }),
+      });
+      setStaffData((prev) => (prev ? { ...prev, photoUrl: url } : prev));
     } catch {
     } finally {
       setPhotoUploading(false);
@@ -192,17 +193,10 @@ export default function StaffProfileScreen() {
     }
     setProfileSaving(true);
     try {
-      await authAPI.updateProfile(editName.trim(), editPhone.trim());
-      const u = auth.currentUser;
-      if (u) {
-        await updateDoc(doc(db, "users", u.uid), {
-          fullName: editName.trim(),
-          phone: editPhone.trim(),
-        });
-        setStaffData((prev) =>
-          prev ? { ...prev, fullName: editName.trim(), phone: editPhone.trim() } : prev,
-        );
-      }
+await authAPI.updateProfile(editName.trim(), editPhone.trim());
+      setStaffData((prev) =>
+        prev ? { ...prev, fullName: editName.trim(), phone: editPhone.trim() } : prev,
+      );
       setProfileSuccess("Profile updated successfully.");
     } catch (err: any) {
       setProfileError(err.message || "Failed.");
@@ -255,10 +249,9 @@ export default function StaffProfileScreen() {
         text: "Confirm",
         style: "destructive",
        onPress: async () => {
-              try {
+         try {
                 await authAPI.logoutAllDevices();
-                await auth.signOut();
-                await AsyncStorage.removeItem("unifix_cached_user");
+                await AsyncStorage.multiRemove(["unifix_access_token", "unifix_refresh_token", "unifix_cached_user"]);
                 router.replace("/login" as any);
               } catch {}
         },
@@ -420,11 +413,10 @@ export default function StaffProfileScreen() {
                   {
                     text: "Yes",
                     style: "destructive",
-            onPress: async () => {
-                      await auth.signOut();
-                      await AsyncStorage.removeItem("unifix_cached_user");
-                      router.replace("/login" as any);
-                    },
+          onPress: async () => {
+              await AsyncStorage.multiRemove(["unifix_access_token", "unifix_refresh_token", "unifix_cached_user"]);
+              router.replace("/login" as any);
+            },
                   },
                 ]
               );

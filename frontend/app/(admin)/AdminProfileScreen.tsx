@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { doc, updateDoc } from "firebase/firestore";
+
 import React, { memo, useCallback, useMemo, useState } from "react";
 import {
   Alert,
@@ -18,7 +18,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { auth, db } from "../../firebase/firebaseConfig";
 
 interface ProfileScreenProps {
   adminData: any;
@@ -50,11 +49,19 @@ const [profileScreen, setProfileScreen] = useState<"main" | "legal" | "settings"
       {
         text: "Log Out",
         style: "destructive",
-      onPress: async () => {
-                      await auth.signOut();
-                      await AsyncStorage.removeItem("unifix_cached_user");
-                      router.replace("/login" as any);
-                    },
+    onPress: async () => {
+        try {
+          const token = await AsyncStorage.getItem("unifix_access_token");
+          if (token) {
+           await fetch(`${process.env.EXPO_PUBLIC_BASE_URL}/auth/logout-all-devices`, {
+              method: "POST",
+              headers: { Authorization: `Bearer ${token}` },
+            });
+          }
+        } catch {}
+        await AsyncStorage.multiRemove(["unifix_access_token", "unifix_refresh_token", "unifix_cached_user"]);
+        router.replace("/login" as any);
+      },
       },
     ]);
   }, [router]);
@@ -80,10 +87,12 @@ const [profileScreen, setProfileScreen] = useState<"main" | "legal" | "settings"
       if (!res.ok) throw new Error("Upload failed");
       const data = await res.json();
       const url = data.secure_url;
-      const u = auth.currentUser;
-      if (u) {
-        await updateDoc(doc(db, "users", u.uid), { photoUrl: url });
-      }
+ const token = await AsyncStorage.getItem("unifix_access_token");
+      await fetch(`${process.env.EXPO_PUBLIC_BASE_URL}/auth/update-profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ photoUrl: url }),
+      });
       Alert.alert("Success", "Profile photo updated!");
     } catch (e: any) {
       Alert.alert("Error", e.message || "Failed to upload photo.");

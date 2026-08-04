@@ -1,11 +1,15 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { adminAPI } from '../services/api'
 import logo from '../icon.png'
 import {
   LayoutDashboard, ClipboardList, Wrench, Users,
-  CreditCard, Trash2, ShieldAlert, LogOut, RefreshCw, AlertCircle, Menu, Clock,
+  CreditCard, Trash2, ShieldAlert, LogOut, AlertCircle,
+  Menu, Clock, Database, RefreshCw, Flag, X, Search,
+  Package,
 } from 'lucide-react'
+import { useTheme } from '../theme/ThemeProvider'
+import { ThemeToggle } from '../components/SharedComponents'
 import OverviewSection from './OverviewSection'
 import { ComplaintsSection } from './ComplaintsSection'
 import MaintenanceSection from './MaintenanceSection'
@@ -15,47 +19,54 @@ import DeletionsSection from './DeletionsSection'
 import SecuritySection from './SecuritySection'
 import HistorySection from './HistorySection'
 import FlaggedSection from './FlaggedSection'
+import MasterDataSection from './MasterDataSection'
+import AnalyticsSection from './AnalyticsSection'
+import LostFoundSection from './LostFoundSection'
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const cooldownRef = useRef(false)
-  const [section, setSection] = useState('overview')
+  const { section = 'overview' } = useParams()
+  const { tokens, mode } = useTheme()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [staff, setStaff] = useState([])
   const [complaints, setComplaints] = useState([])
   const [users, setUsers] = useState([])
-  const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0, total: 0, students: 0, teachers: 0, complaints: {}, pendingIdCardRequests: 0, pendingDeletionRequests: 0, openSecurityIssues: 0 })
+  const [lostFoundItems, setLostFoundItems] = useState([])
+  const [lostReports, setLostReports] = useState([])
+  const [stats, setStats] = useState({
+    pending: 0, approved: 0, rejected: 0, total: 0,
+    students: 0, teachers: 0, complaints: {},
+    pendingIdCardRequests: 0, pendingDeletionRequests: 0, openSecurityIssues: 0,
+  })
   const [staffTab, setStaffTab] = useState('pending')
   const [complaintTab, setComplaintTab] = useState('all')
   const [userTab, setUserTab] = useState('student')
+  const [lfTab, setLfTab] = useState('found_items')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [cooldownSeconds, setCooldownSeconds] = useState(0)
-  const refreshCooldown = cooldownSeconds > 0
   const [activeComplaint, setActiveComplaint] = useState(null)
   const [error, setError] = useState('')
   const [idCardRequests, setIdCardRequests] = useState([])
   const [deletionRequests, setDeletionRequests] = useState({ staffRequests: [], userDeletions: [] })
   const [securityIssues, setSecurityIssues] = useState([])
+  const [masterData, setMasterData] = useState(null)
+  const [masterLoading, setMasterLoading] = useState(false)
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), [])
 
   const handleNavClick = useCallback((key) => {
-    setSection(key)
+    navigate(`/${key}`)
     setSidebarOpen(false)
-  }, [])
+  }, [navigate])
 
   useEffect(() => {
-    if (sidebarOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
+    document.body.style.overflow = sidebarOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [sidebarOpen])
 
   const fetchAll = useCallback(async () => {
-    setLoading(true); setError('')
+    setLoading(true)
+    setError('')
     try {
       const [staffRes, statsRes, complaintsRes, usersRes] = await Promise.all([
         adminAPI.getAllStaff(),
@@ -68,83 +79,135 @@ export default function Dashboard() {
       setComplaints(complaintsRes.data.complaints ?? [])
       setUsers(usersRes.data.users ?? [])
     } catch (err) {
-      if (err.response?.status === 401) { localStorage.removeItem('unifix_admin_token'); navigate('/login') }
-      else setError('Failed to load dashboard data.')
-    } finally { setLoading(false) }
+      if (err.response?.status === 401) {
+        localStorage.removeItem('unifix_admin_token')
+        navigate('/login')
+      } else {
+        setError('Failed to load dashboard data.')
+      }
+    } finally {
+      setLoading(false)
+    }
   }, [navigate])
 
   const fetchIdCardRequests = useCallback(async () => {
-    try { const r = await adminAPI.getIdCardRequests(); setIdCardRequests(r.data.requests ?? []) } catch {
-      //Catch block
-    }
+    try {
+      const r = await adminAPI.getIdCardRequests()
+      setIdCardRequests(r.data.requests ?? [])
+    } catch {}
   }, [])
 
   const fetchDeletionRequests = useCallback(async () => {
-    try { const r = await adminAPI.getDeletionRequests(); setDeletionRequests(r.data ?? { staffRequests: [], userDeletions: [] }) } catch {
-      //Catch block
-    }
+    try {
+      const r = await adminAPI.getDeletionRequests()
+      setDeletionRequests(r.data ?? { staffRequests: [], userDeletions: [] })
+    } catch {}
   }, [])
 
   const fetchSecurityIssues = useCallback(async () => {
-    try { const r = await adminAPI.getSecurityIssues(); setSecurityIssues(r.data.issues ?? []) } catch { 
-      //Catch block
-    }
+    try {
+      const r = await adminAPI.getSecurityIssues()
+      setSecurityIssues(r.data.issues ?? [])
+    } catch {}
+  }, [])
+
+  const fetchMasterData = useCallback(async () => {
+    setMasterLoading(true)
+    try {
+      const r = await adminAPI.getMasterDataAdmin()
+      setMasterData(r.data)
+    } catch {}
+    finally { setMasterLoading(false) }
+  }, [])
+
+  const fetchLostFound = useCallback(async () => {
+    try {
+      const [itemsRes, reportsRes] = await Promise.all([
+        adminAPI.getLostFoundItems ? adminAPI.getLostFoundItems() : Promise.resolve({ data: { items: [] } }),
+        adminAPI.getLostReports ? adminAPI.getLostReports() : Promise.resolve({ data: { reports: [] } }),
+      ])
+      setLostFoundItems(itemsRes.data.items ?? [])
+      setLostReports(reportsRes.data.reports ?? [])
+    } catch {}
   }, [])
 
   const handleRefresh = useCallback(async () => {
+    if (refreshing) return
     setRefreshing(true)
-    await fetchAll()
-    if (section === 'idcards') await fetchIdCardRequests()
-    if (section === 'deletions') await fetchDeletionRequests()
-    if (section === 'security') await fetchSecurityIssues()
-    setRefreshing(false)
-  }, [section, fetchAll, fetchIdCardRequests, fetchDeletionRequests, fetchSecurityIssues])
+    try {
+      if (section === 'overview') await fetchAll()
+      else if (section === 'complaints') { const r = await adminAPI.getAllComplaints(); setComplaints(r.data.complaints ?? []) }
+      else if (section === 'staff') { const r = await adminAPI.getAllStaff(); setStaff(r.data.staff ?? []) }
+      else if (section === 'users') { const r = await adminAPI.getAllUsers(); setUsers(r.data.users ?? []) }
+      else if (section === 'idcards') await fetchIdCardRequests()
+      else if (section === 'deletions') await fetchDeletionRequests()
+      else if (section === 'security') await fetchSecurityIssues()
+      else if (section === 'flagged') await fetchAll()
+      else if (section === 'history') { const r = await adminAPI.getAllComplaints(); setComplaints(r.data.complaints ?? []) }
+      else if (section === 'master') await fetchMasterData()
+      else if (section === 'lostfound') await fetchLostFound()
+    } catch {}
+    finally { setRefreshing(false) }
+  }, [refreshing, section, fetchAll, fetchIdCardRequests, fetchDeletionRequests, fetchSecurityIssues, fetchMasterData, fetchLostFound])
 
-  async function handleRefreshWithInvalidate() {
-    if (cooldownRef.current) return
-    cooldownRef.current = true
-    setCooldownSeconds(30)
-    await handleRefresh()
-    const interval = setInterval(() => {
-      setCooldownSeconds(prev => {
-        if (prev <= 1) {
-          clearInterval(interval)
-          cooldownRef.current = false
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-  }
-
-  useEffect(() => {
-    fetchAll()
-  }, [fetchAll])
+  useEffect(() => { fetchAll() }, [fetchAll])
 
   useEffect(() => {
     if (section === 'idcards') fetchIdCardRequests()
     if (section === 'deletions') fetchDeletionRequests()
     if (section === 'security') fetchSecurityIssues()
-  }, [section, fetchIdCardRequests, fetchDeletionRequests, fetchSecurityIssues])
+    if (section === 'master') fetchMasterData()
+    if (section === 'lostfound') fetchLostFound()
+  }, [section, fetchIdCardRequests, fetchDeletionRequests, fetchSecurityIssues, fetchMasterData, fetchLostFound])
 
-  const logout = useCallback(() => { localStorage.removeItem('unifix_admin_token'); navigate('/login') }, [navigate])
+  const logout = useCallback(() => {
+    localStorage.removeItem('unifix_admin_token')
+    navigate('/login')
+  }, [navigate])
 
   const cs = stats.complaints ?? {}
   const visibleStaff = useMemo(() => staff.filter(m => m.verificationStatus === staffTab), [staff, staffTab])
-  const visibleComplaints = useMemo(() => complaintTab === 'all' ? complaints : complaints.filter(c => c.status === complaintTab), [complaints, complaintTab])
+  const visibleComplaints = useMemo(() =>
+    complaintTab === 'all' ? complaints :
+    complaintTab === 'flagged' ? complaints.filter(c => c.flagged && !c.flagResolved && ['pending','assigned','in_progress'].includes(c.status)) :
+    complaints.filter(c => c.status === complaintTab),
+    [complaints, complaintTab]
+  )
   const visibleUsers = useMemo(() => users.filter(u => u.role === userTab), [users, userTab])
-  const flaggedCount = complaints.filter(c => c.flagged && !c.flagResolved && ['pending', 'assigned', 'in_progress'].includes(c.status)).length
+  const flaggedCount = complaints.filter(c => c.flagged && !c.flagResolved && ['pending','assigned','in_progress'].includes(c.status)).length
+
+  const lfAvailable = lostFoundItems.filter(i => i.status === 'available').length
+  const lfHandedOver = lostFoundItems.filter(i => i.status === 'handed_over').length
+  const lrActive = lostReports.filter(r => r.status !== 'found').length
+  const lrFound = lostReports.filter(r => r.status === 'found').length
+
+  const visibleLF = useMemo(() => {
+    if (lfTab === 'found_items') return lostFoundItems
+    if (lfTab === 'available') return lostFoundItems.filter(i => i.status === 'available')
+    if (lfTab === 'handed_over') return lostFoundItems.filter(i => i.status === 'handed_over')
+    if (lfTab === 'lost_reports') return lostReports
+    if (lfTab === 'lost_active') return lostReports.filter(r => r.status !== 'found')
+    if (lfTab === 'lost_found') return lostReports.filter(r => r.status === 'found')
+    return lostFoundItems
+  }, [lfTab, lostFoundItems, lostReports])
 
   const NAV_SECTIONS = [
     {
       label: 'Main',
       items: [
         { key: 'overview', Icon: LayoutDashboard, label: 'Dashboard' },
-        { key: 'flagged', Icon: AlertCircle, label: 'Flagged', badge: flaggedCount },
+        { key: 'flagged', Icon: Flag, label: 'Flagged', badge: flaggedCount },
         { key: 'complaints', Icon: ClipboardList, label: 'Complaints', badge: cs.pending },
         { key: 'history', Icon: Clock, label: 'History' },
+        { key: 'analytics', Icon: LayoutDashboard, label: 'Analytics' },
+      ],
+    },
+    {
+      label: 'Management',
+      items: [
         { key: 'staff', Icon: Wrench, label: 'Maintenance', badge: stats.pending },
         { key: 'users', Icon: Users, label: 'Staff & Users' },
+        { key: 'lostfound', Icon: Package, label: 'Lost & Found' },
       ],
     },
     {
@@ -155,73 +218,181 @@ export default function Dashboard() {
         { key: 'security', Icon: ShieldAlert, label: 'Security', badge: stats.openSecurityIssues },
       ],
     },
+    {
+      label: 'Configuration',
+      items: [
+        { key: 'master', Icon: Database, label: 'Master Data' },
+      ],
+    },
   ]
 
   const sectionLabel = NAV_SECTIONS.flatMap(s => s.items).find(i => i.key === section)?.label ?? 'Dashboard'
 
   return (
-    <div className="flex min-h-screen bg-[#f4f6f8] font-['DM_Sans']">
-      <div
-        className={`fixed inset-0 bg-[#0f172a]/55 z-[19] backdrop-blur-[2px] transition-opacity duration-250 md:hidden ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-        onClick={closeSidebar}
-      />
+    <div style={{ display: 'flex', minHeight: '100vh', background: tokens.bg, fontFamily: "'Inter', 'DM Sans', sans-serif" }}>
+      {sidebarOpen && (
+        <div
+          onClick={closeSidebar}
+          style={{
+            position: 'fixed', inset: 0, background: tokens.modalOverlay,
+            zIndex: 19, backdropFilter: 'blur(2px)',
+          }}
+        />
+      )}
 
-      <aside className={`w-[228px] shrink-0 bg-[#0f172a] flex flex-col fixed top-0 left-0 bottom-0 z-[20] transition-transform duration-280 ease-[cubic-bezier(0.4,0,0.2,1)] md:translate-x-0 ${sidebarOpen ? 'translate-x-0 shadow-[8px_0_32px_rgba(0,0,0,0.25)]' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="p-[22px_18px_18px] border-b border-white/5 flex items-center gap-[11px]">
-          <img src={logo} alt="UniFiX" className="w-[42px] h-[42px] object-contain shrink-0" />
-          <div className="flex-1">
-            <div className="text-[15px] font-extrabold text-white tracking-[-0.3px]">UniFiX</div>
-            <div className="text-[9px] font-bold text-[#4ade80] tracking-[1.5px] uppercase mt-[2px]">Admin Panel</div>
+      <aside style={{
+        width: 220, flexShrink: 0, background: tokens.sidebar,
+        display: 'flex', flexDirection: 'column',
+        position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 20,
+        transform: sidebarOpen ? 'translateX(0)' : undefined,
+        transition: 'transform 0.25s ease',
+        boxShadow: sidebarOpen ? '4px 0 24px rgba(0,0,0,0.3)' : 'none',
+      }}
+        className="sidebar-desktop"
+      >
+        <div style={{
+          padding: '18px 16px', borderBottom: `1px solid ${tokens.sidebarBorder}`,
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <img src={logo} alt="UniFiX" style={{ width: 36, height: 36, objectFit: 'contain', borderRadius: 8, flexShrink: 0 }} />
+          <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: tokens.text, letterSpacing: '-0.02em' }}>UniFiX</div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: tokens.success, letterSpacing: '1.5px', textTransform: 'uppercase', marginTop: 2 }}>Admin Panel</div>
           </div>
         </div>
-        <nav className="p-[14px_10px] flex-1 flex flex-col gap-[2px] overflow-y-auto">
+
+        <nav style={{ padding: '12px 8px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {NAV_SECTIONS.map(sec => (
             <div key={sec.label}>
-              <div className="text-[9px] font-bold text-white/25 tracking-[1.2px] uppercase p-[10px_8px_6px]">{sec.label}</div>
-              {sec.items.map(({ key, Icon, label, badge }) => (
-                <button key={key} className={`flex items-center gap-[10px] p-[9px_10px] rounded-[9px] border-none text-[13px] font-medium cursor-pointer w-full text-left transition-all duration-150 relative ${section === key ? 'bg-[#16a34a]/15 text-[#4ade80] font-bold' : 'bg-transparent text-white/50 hover:bg-white/5 hover:text-white/85'}`} onClick={() => handleNavClick(key)}>
-                  <Icon className="w-[16px] h-[16px] shrink-0" size={15} />
-                  <span className="flex-1">{label}</span>
-                  {badge > 0 && <span className={`ml-auto text-[10px] font-extrabold px-[7px] py-[1px] rounded-[20px] shrink-0 ${section === key ? 'bg-[#16a34a] text-white' : 'bg-[#f59e0b] text-[#0f172a]'}`}>{badge}</span>}
-                  {section === key && <div className="absolute left-0 top-[6px] bottom-[6px] w-[3px] rounded-r-[3px] bg-[#16a34a]" />}
-                </button>
-              ))}
+              <div style={{
+                fontSize: 9, fontWeight: 700, color: tokens.sidebarLabel,
+                letterSpacing: '1.2px', textTransform: 'uppercase',
+                padding: '10px 8px 5px',
+              }}>
+                {sec.label}
+              </div>
+              {sec.items.map(({ key, Icon, label, badge }) => {
+                const isActive = section === key
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleNavClick(key)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 9,
+                      padding: '8px 10px', borderRadius: 8, border: 'none',
+                      fontSize: 13, fontWeight: isActive ? 700 : 500,
+                      cursor: 'pointer', width: '100%', textAlign: 'left',
+                      transition: 'all 0.15s', position: 'relative',
+                      background: isActive ? tokens.sidebarActive : 'transparent',
+                      color: isActive ? tokens.sidebarTextActive : tokens.sidebarText,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {isActive && (
+                      <div style={{
+                        position: 'absolute', left: 0, top: 6, bottom: 6,
+                        width: 3, borderRadius: '0 3px 3px 0',
+                        background: tokens.primary,
+                      }} />
+                    )}
+                    <Icon size={15} style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>{label}</span>
+                    {badge > 0 && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '1px 7px',
+                        borderRadius: tokens.radius.pill, flexShrink: 0,
+                        background: isActive ? tokens.primary : tokens.warning,
+                        color: '#fff',
+                      }}>
+                        {badge}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
             </div>
           ))}
         </nav>
-        <div className="p-[12px_10px_16px] border-t border-white/5">
-          <button className="flex items-center gap-[9px] p-[9px_10px] rounded-[9px] border-none bg-[#dc2626]/10 text-[#f87171] text-[13px] font-semibold cursor-pointer w-full transition-all duration-150 hover:bg-[#dc2626]/20 hover:text-[#fca5a5]" onClick={logout}>
+
+        <div style={{ padding: '10px 8px 16px', borderTop: `1px solid ${tokens.sidebarBorder}` }}>
+          <button
+            onClick={logout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 9,
+              padding: '8px 10px', borderRadius: 8, border: 'none',
+              background: 'rgba(248,81,73,0.1)', color: '#f85149',
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              width: '100%', fontFamily: 'inherit', transition: 'all 0.15s',
+            }}
+          >
             <LogOut size={15} /> Log out
           </button>
         </div>
       </aside>
 
-      <div className="flex-1 md:ml-[228px] flex flex-col min-h-screen">
-        <header className="h-[58px] bg-white flex items-center justify-between px-[28px] shrink-0 sticky top-0 z-[10] border-b border-[#e9ecef] md:px-[28px]">
-          <div className="flex items-center gap-[12px]">
-            <button className="flex md:hidden items-center justify-center w-[36px] h-[36px] rounded-[9px] border-[1.5px] border-[#e2e8f0] bg-[#f8fafc] text-[#475569] cursor-pointer hover:bg-[#f0fdf4] hover:border-[#16a34a] hover:text-[#16a34a]" onClick={() => setSidebarOpen(true)}>
-              <Menu size={18} />
+      <div style={{ flex: 1, marginLeft: 220, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}
+        className="main-content">
+        <header style={{
+          height: 56, background: tokens.headerBg,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0 24px', flexShrink: 0,
+          position: 'sticky', top: 0, zIndex: 10,
+          borderBottom: `1px solid ${tokens.headerBorder}`,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="menu-btn-mobile"
+              style={{
+                display: 'none', width: 34, height: 34, borderRadius: 8,
+                border: `1.5px solid ${tokens.border}`,
+                background: tokens.surfaceHigh, color: tokens.textSecondary,
+                cursor: 'pointer', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Menu size={16} />
             </button>
             <div>
-              <div className="text-[14px] font-bold text-[#0f172a] tracking-[-0.2px]">{sectionLabel}</div>
-              <div className="text-[12px] text-[#94a3b8] mt-[1px]">UniFiX Admin</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: tokens.text, letterSpacing: '-0.01em' }}>{sectionLabel}</div>
+              <div style={{ fontSize: 11, color: tokens.textMuted, marginTop: 1 }}>UniFiX Admin</div>
             </div>
           </div>
-          <button
-            className={`flex items-center gap-[7px] border-[1.5px] rounded-[9px] p-[7px_14px] text-[13px] font-semibold transition-all duration-150 ${refreshCooldown ? 'bg-[#f1f5f9] text-[#94a3b8] border-[#e2e8f0] cursor-not-allowed' : 'bg-[#f8fafc] text-[#475569] border-[#e2e8f0] cursor-pointer hover:bg-[#f0fdf4] hover:border-[#16a34a] hover:text-[#16a34a]'}`}
-            onClick={handleRefreshWithInvalidate}
-            disabled={refreshCooldown}
-          >
-            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-            <span className="hidden sm:inline">
-              {refreshing ? 'Refreshing…' : refreshCooldown ? `Wait ${cooldownSeconds}s…` : 'Refresh'}
-            </span>
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle />
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                border: `1.5px solid ${tokens.border}`, borderRadius: 8,
+                padding: '6px 12px', fontSize: 12, fontWeight: 600,
+                background: tokens.surface, color: tokens.textSecondary,
+                cursor: refreshing ? 'not-allowed' : 'pointer',
+                opacity: refreshing ? 0.6 : 1, fontFamily: 'inherit',
+                transition: 'all 0.15s',
+              }}
+            >
+              <RefreshCw size={13} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+              <span>{refreshing ? 'Refreshing…' : 'Refresh'}</span>
+            </button>
+          </div>
         </header>
 
-        <main className="flex-1 p-[28px] overflow-auto md:p-[28px] sm:p-[16px]">
-          {error && <div className="flex items-center gap-[10px] bg-[#fef2f2] text-[#dc2626] border border-[#fecaca] rounded-[10px] p-[12px_16px] text-[13px] font-semibold mb-[20px]"><AlertCircle size={16} /> {error}</div>}
-          {section === 'overview' && <OverviewSection stats={stats} cs={cs} complaints={complaints} onNavigate={setSection} loading={loading} />}
+        <main style={{ flex: 1, padding: 28, overflowAuto: 'auto' }}>
+          {error && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: tokens.dangerBg, color: tokens.danger,
+              border: `1px solid ${tokens.dangerBorder}`,
+              borderRadius: 10, padding: '12px 16px',
+              fontSize: 13, fontWeight: 600, marginBottom: 20,
+            }}>
+              <AlertCircle size={16} /> {error}
+            </div>
+          )}
+
+          {section === 'overview' && <OverviewSection stats={stats} cs={cs} complaints={complaints} onNavigate={(key) => navigate(`/${key}`)} loading={loading} />}
           {section === 'complaints' && <ComplaintsSection allComplaints={complaints} visible={visibleComplaints} activeTab={complaintTab} onTabChange={setComplaintTab} cs={cs} loading={loading} focused={activeComplaint} setFocused={setActiveComplaint} />}
           {section === 'staff' && <MaintenanceSection items={visibleStaff} activeTab={staffTab} onTabChange={setStaffTab} stats={stats} loading={loading} navigate={navigate} />}
           {section === 'users' && <StaffUsersSection items={visibleUsers} activeTab={userTab} onTabChange={setUserTab} stats={stats} loading={loading} />}
@@ -230,8 +401,34 @@ export default function Dashboard() {
           {section === 'security' && <SecuritySection issues={securityIssues} loading={loading} onRefresh={fetchSecurityIssues} />}
           {section === 'flagged' && <FlaggedSection allComplaints={complaints} loading={loading} onRefresh={fetchAll} />}
           {section === 'history' && <HistorySection allComplaints={complaints} loading={loading} />}
+          {section === 'analytics' && <AnalyticsSection complaints={complaints} loading={loading} />}
+          {section === 'master' && <MasterDataSection data={masterData} loading={masterLoading} onRefresh={fetchMasterData} />}
+          {section === 'lostfound' && (
+            <LostFoundSection
+              items={visibleLF}
+              allItems={lostFoundItems}
+              lostReports={lostReports}
+              activeTab={lfTab}
+              onTabChange={setLfTab}
+              available={lfAvailable}
+              handedOver={lfHandedOver}
+              lrActive={lrActive}
+              lrFound={lrFound}
+              loading={loading}
+            />
+          )}
         </main>
       </div>
+
+      <style>{`
+        @media (max-width: 768px) {
+          .sidebar-desktop { transform: ${sidebarOpen ? 'translateX(0)' : 'translateX(-100%)'}; }
+          .main-content { margin-left: 0 !important; }
+          .menu-btn-mobile { display: flex !important; }
+          main { padding: 16px !important; }
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }

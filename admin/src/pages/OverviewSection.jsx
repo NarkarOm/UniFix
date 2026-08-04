@@ -1,101 +1,191 @@
 import { ChevronRight, CreditCard, Trash2, ShieldAlert, Zap, Droplets, Hammer, Sparkles, Monitor, Shield, Bath, FileText } from 'lucide-react'
+import { useTheme } from '../theme/ThemeProvider'
+import { SectionHeader, StatusBadge } from '../components/SharedComponents'
 import AnalyticsSection from './AnalyticsSection'
 import { CATEGORY } from '../constants'
-import {formatDateShort} from '../utils/dateUtils'
-import { StatusBadge, SectionHeader } from '../components/SharedComponents'
+import { formatDateShort } from '../utils/dateUtils'
 
 const CATEGORY_ICONS = {
-  electrical: Zap,
-  plumbing: Droplets,
-  carpentry: Hammer,
-  cleaning: Sparkles,
-  technician: Monitor,
-  safety: Shield,
-  washroom: Bath,
-  others: FileText,
+  electrical: Zap, plumbing: Droplets, carpentry: Hammer,
+  cleaning: Sparkles, technician: Monitor, safety: Shield,
+  washroom: Bath, others: FileText,
 }
 
 export default function OverviewSection({ stats, cs, complaints, onNavigate, loading }) {
+  const { tokens } = useTheme()
   const recent = complaints.slice(0, 6)
+
   const statCards = [
-    { label: 'Total Complaints', value: cs.total ?? 0, sub: `${cs.pending ?? 0} pending`, subColor: '#d97706', color: '#f59e0b', section: 'complaints' },
-    { label: 'Pending', value: cs.pending ?? 0, sub: 'Requires attention', subColor: '#dc2626', color: '#ef4444', section: 'complaints' },
-    { label: 'In Progress', value: cs.in_progress ?? 0, sub: 'Staff assigned', subColor: '#7c3aed', color: '#8b5cf6', section: 'complaints' },
-    { label: 'Resolved', value: cs.completed ?? 0, sub: `${cs.total ? Math.round((cs.completed / cs.total) * 100) : 0}% success rate`, subColor: '#059669', color: '#10b981', section: 'complaints' },
-    { label: 'Students', value: stats.students ?? 0, sub: 'Active profiles', subColor: '#6b7280', color: '#6366f1', section: 'users' },
-    { label: 'Active Staff', value: stats.approved ?? 0, sub: 'Verified staff', subColor: '#6b7280', color: '#0ea5e9', section: 'staff' },
+    { label: 'Total Complaints', value: cs.total ?? 0, sub: `${cs.pending ?? 0} pending`, color: tokens.warning, section: 'complaints' },
+    { label: 'Pending', value: cs.pending ?? 0, sub: 'Requires attention', color: tokens.danger, section: 'complaints' },
+    { label: 'In Progress', value: cs.in_progress ?? 0, sub: 'Staff assigned', color: tokens.purple, section: 'complaints' },
+    { label: 'Resolved', value: cs.completed ?? 0, sub: `${cs.total ? Math.round((cs.completed / cs.total) * 100) : 0}% success rate`, color: tokens.success, section: 'complaints' },
+    { label: 'Students', value: stats.students ?? 0, sub: 'Active profiles', color: tokens.primary, section: 'users' },
+    { label: 'Active Staff', value: stats.approved ?? 0, sub: 'Verified staff', color: tokens.info, section: 'staff' },
   ]
+
+  const alertCards = [
+    stats.pendingIdCardRequests > 0 && {
+      key: 'idcards', Icon: CreditCard, value: stats.pendingIdCardRequests,
+      label: 'Pending ID Card Requests',
+      bg: tokens.warningBg, border: tokens.warningBorder, color: tokens.warning,
+    },
+    stats.pendingDeletionRequests > 0 && {
+      key: 'deletions', Icon: Trash2, value: stats.pendingDeletionRequests,
+      label: 'Pending Deletion Requests',
+      bg: tokens.dangerBg, border: tokens.dangerBorder, color: tokens.danger,
+    },
+    stats.openSecurityIssues > 0 && {
+      key: 'security', Icon: ShieldAlert, value: stats.openSecurityIssues,
+      label: 'Open Security Issues',
+      bg: tokens.warningBg, border: tokens.warningBorder, color: tokens.warning,
+    },
+  ].filter(Boolean)
+
   return (
     <div>
       <SectionHeader title="Campus Overview" subtitle="Welcome back. Here's what's happening across campus today." />
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-[12px] mb-[20px]">
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+        gap: 12, marginBottom: 20,
+      }}>
         {statCards.map(card => (
-          <div key={card.label} className="group bg-white rounded-[14px] p-[18px_16px] border border-[#f0f0f0] cursor-pointer transition-all duration-180 relative overflow-hidden hover:-translate-y-[2px] hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)]" onClick={() => onNavigate(card.section)}>
-            <div className="text-[10px] font-bold text-[#94a3b8] tracking-[0.6px] uppercase mb-[10px]">{card.label}</div>
-            <div className="text-[30px] font-extrabold leading-none mb-[7px] tracking-[-1px]" style={{ color: card.color }}>{loading ? '—' : card.value.toLocaleString()}</div>
-            <div className="text-[11px] font-semibold" style={{ color: card.subColor }}>{card.sub}</div>
-            <div className="absolute bottom-0 left-0 right-0 h-[3px] opacity-0 transition-opacity duration-180 group-hover:opacity-100" style={{ background: card.color }} />
+          <div
+            key={card.label}
+            onClick={() => onNavigate(card.section)}
+            style={{
+              background: tokens.surface, border: `1px solid ${tokens.border}`,
+              borderRadius: tokens.radius.xl, padding: '18px 16px',
+              cursor: 'pointer', transition: 'all 0.18s',
+              position: 'relative', overflow: 'hidden',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = tokens.shadowMd
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'none'
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: tokens.textMuted, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 10 }}>{card.label}</div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: card.color, letterSpacing: '-0.04em', marginBottom: 6 }}>
+              {loading ? '—' : card.value.toLocaleString()}
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: tokens.textMuted }}>{card.sub}</div>
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, height: 3,
+              background: card.color, opacity: 0, transition: 'opacity 0.18s',
+            }} className="stat-bar" />
           </div>
         ))}
       </div>
-      {(stats.pendingIdCardRequests > 0 || stats.pendingDeletionRequests > 0 || stats.openSecurityIssues > 0) && (
-        <div className="flex flex-col md:flex-row gap-[12px] mb-[20px]">
-          {stats.pendingIdCardRequests > 0 && (
-            <div className="bg-white rounded-[12px] p-[14px_20px] flex items-center gap-[12px] cursor-pointer transition-all duration-150 border-[1.5px] border-[#fde68a] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,0,0,0.07)]" onClick={() => onNavigate('idcards')}>
-              <div className="w-[40px] h-[40px] rounded-[10px] flex items-center justify-center shrink-0 bg-[#fef3c7]"><CreditCard size={18} color="#d97706" /></div>
-              <div><div className="text-[20px] font-extrabold leading-none text-[#d97706]">{stats.pendingIdCardRequests}</div><div className="text-[12px] font-semibold mt-[2px] text-[#92400e]">Pending ID Card Requests</div></div>
+
+      {alertCards.length > 0 && (
+        <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+          {alertCards.map(card => (
+            <div
+              key={card.key}
+              onClick={() => onNavigate(card.key)}
+              style={{
+                background: card.bg, border: `1.5px solid ${card.border}`,
+                borderRadius: tokens.radius.xl, padding: '14px 20px',
+                display: 'flex', alignItems: 'center', gap: 12,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = tokens.shadowMd }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' }}
+            >
+              <div style={{
+                width: 40, height: 40, borderRadius: tokens.radius.lg,
+                background: tokens.surface, display: 'flex',
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <card.Icon size={18} color={card.color} />
+              </div>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: card.color, lineHeight: 1 }}>{card.value}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: card.color, marginTop: 3, opacity: 0.8 }}>{card.label}</div>
+              </div>
             </div>
-          )}
-          {stats.pendingDeletionRequests > 0 && (
-            <div className="bg-white rounded-[12px] p-[14px_20px] flex items-center gap-[12px] cursor-pointer transition-all duration-150 border-[1.5px] border-[#fecaca] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,0,0,0.07)]" onClick={() => onNavigate('deletions')}>
-              <div className="w-[40px] h-[40px] rounded-[10px] flex items-center justify-center shrink-0 bg-[#fef2f2]"><Trash2 size={18} color="#dc2626" /></div>
-              <div><div className="text-[20px] font-extrabold leading-none text-[#dc2626]">{stats.pendingDeletionRequests}</div><div className="text-[12px] font-semibold mt-[2px] text-[#991b1b]">Pending Deletion Requests</div></div>
-            </div>
-          )}
-          {stats.openSecurityIssues > 0 && (
-            <div className="bg-white rounded-[12px] p-[14px_20px] flex items-center gap-[12px] cursor-pointer transition-all duration-150 border-[1.5px] border-[#fcd34d] hover:-translate-y-[1px] hover:shadow-[0_4px_14px_rgba(0,0,0,0.07)]" onClick={() => onNavigate('security')}>
-              <div className="w-[40px] h-[40px] rounded-[10px] flex items-center justify-center shrink-0 bg-[#fef3c7]"><ShieldAlert size={18} color="#d97706" /></div>
-              <div><div className="text-[20px] font-extrabold leading-none text-[#d97706]">{stats.openSecurityIssues}</div><div className="text-[12px] font-semibold mt-[2px] text-[#92400e]">Open Security Issues</div></div>
-            </div>
-          )}
+          ))}
         </div>
       )}
-     <div className="mt-[24px]">
+
+      <div style={{ marginTop: 24 }}>
         <AnalyticsSection complaints={complaints} loading={loading} />
       </div>
-      <div className="bg-white rounded-[16px] border border-[#f0f0f0] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.04)] mt-[24px]">
-        <div className="flex justify-between items-center p-[16px_22px] border-b border-[#f5f5f5]">
-          <span className="text-[14px] font-bold text-[#0f172a]">Recent Activity</span>
-          <button className="bg-none border-none text-[#16a34a] text-[13px] font-bold cursor-pointer flex items-center gap-[4px] transition-[gap] duration-150 hover:gap-[7px]" onClick={() => onNavigate('complaints')}>View All <ChevronRight size={14} /></button>
+
+      <div style={{
+        background: tokens.surface, borderRadius: tokens.radius.xxl,
+        border: `1px solid ${tokens.border}`, overflow: 'hidden',
+        boxShadow: tokens.shadow, marginTop: 24,
+      }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '14px 20px', borderBottom: `1px solid ${tokens.border}`,
+        }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: tokens.text }}>Recent Activity</span>
+          <button
+            onClick={() => onNavigate('complaints')}
+            style={{
+              background: 'none', border: 'none', color: tokens.primary,
+              fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'inherit',
+            }}
+          >
+            View All <ChevronRight size={14} />
+          </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead><tr className="bg-[#fafafa]">{['Complaint', 'Location', 'Reported By', 'Status', 'Date'].map(h => <th key={h} className="p-[10px_20px] text-left text-[10px] font-bold text-[#94a3b8] tracking-[0.6px] uppercase border-b border-[#f0f0f0] whitespace-nowrap">{h}</th>)}</tr></thead>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: tokens.tableHeadBg }}>
+                {['Complaint', 'Location', 'Reported By', 'Status', 'Date'].map(h => (
+                  <th key={h} style={{
+                    padding: '10px 18px', textAlign: 'left',
+                    fontSize: 11, fontWeight: 700, color: tokens.textMuted,
+                    letterSpacing: '0.05em', textTransform: 'uppercase',
+                    borderBottom: `1px solid ${tokens.border}`, whiteSpace: 'nowrap',
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
             <tbody>
-              {loading ? <tr><td colSpan={5} className="p-[60px] text-center text-[#94a3b8] text-[14px]">Loading…</td></tr>
-                : recent.length === 0 ? <tr><td colSpan={5} className="p-[60px] text-center text-[#94a3b8] text-[14px]">No complaints yet</td></tr>
-                  : recent.map(c => {
-                    const catMeta = CATEGORY[c.category] ?? CATEGORY.others
-                    const CatIcon = CATEGORY_ICONS[c.category] ?? CATEGORY_ICONS.others
-                    return (
-                      <tr key={c.id} className="transition-colors duration-100 cursor-default hover:bg-[#fafafa]">
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle">
-                          <div className="flex items-center gap-[10px]">
-                            <div className="w-[30px] h-[30px] rounded-[8px] flex items-center justify-center shrink-0" style={{ background: catMeta.bg }}><CatIcon size={14} color={catMeta.color} /></div>
-                            <span className="text-[13px] font-semibold text-[#0f172a]">{c.subIssue || c.customIssue || 'Issue Reported'}</span>
-                          </div>
-                        </td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle text-[13px] text-[#374151]">{[c.building, c.roomDetail].filter(Boolean).join(', ') || '—'}</td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle text-[13px] text-[#374151] font-medium">{c.submittedByName || '—'}</td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle"><StatusBadge status={c.status} /></td>
-                        <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle"><span className="text-[12px] text-[#94a3b8]">{formatDateShort(c.createdAt)}</span></td>
-                      </tr>
-                    )
-                  })}
+              {loading ? (
+                <tr><td colSpan={5} style={{ padding: '60px', textAlign: 'center', color: tokens.textMuted, fontSize: 14 }}>Loading…</td></tr>
+              ) : recent.length === 0 ? (
+                <tr><td colSpan={5} style={{ padding: '60px', textAlign: 'center', color: tokens.textMuted, fontSize: 14 }}>No complaints yet</td></tr>
+              ) : recent.map(c => {
+                const catMeta = CATEGORY[c.category] ?? CATEGORY.others
+                const CatIcon = CATEGORY_ICONS[c.category] ?? CATEGORY_ICONS.others
+                return (
+                  <tr key={c.id}
+                    style={{ transition: 'background 0.1s', cursor: 'default' }}
+                    onMouseEnter={e => e.currentTarget.style.background = tokens.tableRowHover}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: tokens.radius.md, background: catMeta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <CatIcon size={14} color={catMeta.color} />
+                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: tokens.text }}>{c.subIssue || c.customIssue || 'Issue Reported'}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}`, fontSize: 13, color: tokens.textSecondary }}>{[c.building, c.roomDetail].filter(Boolean).join(', ') || '—'}</td>
+                    <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}`, fontSize: 13, color: tokens.textSecondary, fontWeight: 500 }}>{c.submittedByName || '—'}</td>
+                    <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}` }}><StatusBadge status={c.status} /></td>
+                    <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}`, fontSize: 12, color: tokens.textMuted }}>{formatDateShort(c.createdAt)}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       </div>
-</div>
+    </div>
   )
 }

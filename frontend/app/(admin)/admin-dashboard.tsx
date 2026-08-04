@@ -14,7 +14,6 @@ import {
   View
 } from "react-native";
 import Toast from "react-native-toast-message";
-import { auth } from "../../firebase/firebaseConfig";
 import { authAPI } from "../../services/api";
 import { getAdminComplaintsFromDb, syncAdminComplaints } from "../../sync/syncManager";
 import AdminComplaintsScreen from "./AdminComplaintsScreen";
@@ -52,12 +51,11 @@ const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateRef = useRef(AppState.currentState);
   const mountedRef = useRef(true);
 
-  async function getAdminToken(): Promise<string> {
-    const user = auth.currentUser;
-    if (!user) throw new Error("Not authenticated");
-    return await user.getIdToken();
+async function getAdminToken(): Promise<string> {
+    const token = await AsyncStorage.getItem("unifix_access_token");
+    if (!token) throw new Error("Not authenticated");
+    return token;
   }
-
 const fetchAdminData = useCallback(async (silent = false) => {
     try {
       if (!silent && !hasFetchedRef.current) setLoading(true);
@@ -150,8 +148,8 @@ useEffect(() => {
 
 useEffect(() => {
     mountedRef.current = true;
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
+    AsyncStorage.getItem("unifix_access_token").then((token) => {
+      if (token) {
         fetchAdminData();
         registerAdminPushToken();
       } else {
@@ -161,7 +159,6 @@ useEffect(() => {
     });
     return () => {
       mountedRef.current = false;
-      unsubscribe();
     };
   }, []);
 

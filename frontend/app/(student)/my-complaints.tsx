@@ -12,7 +12,7 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { auth } from "../../firebase/firebaseConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLoadingStore } from "../../store/loadingStore";
 import { getStudentComplaintsFromDb, syncStudentComplaints } from '../../sync/syncManager';
 
@@ -83,10 +83,11 @@ const fetchComplaints = useCallback(async (uid: string) => {
     setComplaints(local);
   }, []);
 
-  const onRefresh = useCallback(async () => {
+const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    const u = auth.currentUser;
-    if (u) await fetchComplaints(u.uid);
+    const cachedStr = await AsyncStorage.getItem("unifix_cached_user");
+    const cached = cachedStr ? JSON.parse(cachedStr) : null;
+    if (cached?.uid) await fetchComplaints(cached.uid);
     setRefreshing(false);
   }, [fetchComplaints]);
 
@@ -102,21 +103,23 @@ const fetchComplaints = useCallback(async (uid: string) => {
   }, []);
 
 useEffect(() => {
-    const u = auth.currentUser;
-    if (!u) { router.replace("/login" as any); return; }
-
     const init = async () => {
+      const token = await AsyncStorage.getItem("unifix_access_token");
+      if (!token) { router.replace("/login" as any); return; }
+      const cachedStr = await AsyncStorage.getItem("unifix_cached_user");
+      const cached = cachedStr ? JSON.parse(cachedStr) : null;
+      const uid = cached?.uid;
+      if (!uid) { router.replace("/login" as any); return; }
       if (!forceSync) {
-        const local = await getStudentComplaintsFromDb(u.uid);
+        const local = await getStudentComplaintsFromDb(uid);
         if (local.length > 0) { setComplaints(local); setLoading(false); }
       }
-      await syncStudentComplaints(u.uid);
-      const updated = await getStudentComplaintsFromDb(u.uid);
+      await syncStudentComplaints(uid);
+      const updated = await getStudentComplaintsFromDb(uid);
       setComplaints(updated);
       markLoaded(SCREEN_KEY);
       setLoading(false);
     };
-
     init();
   }, [forceSync]);
 
@@ -134,12 +137,12 @@ useEffect(() => {
         <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
         <View style={s.header}>
           <TouchableOpacity onPress={() => {
-  const u = auth.currentUser;
-  if (u) {
-    import("../../sync/syncManager").then(({ syncStudentComplaints }) => {
-      syncStudentComplaints(u.uid);
+AsyncStorage.getItem("unifix_cached_user").then((str) => {
+    const uid = str ? JSON.parse(str)?.uid : null;
+    if (uid) import("../../sync/syncManager").then(({ syncStudentComplaints }) => {
+      syncStudentComplaints(uid);
     });
-  }
+  });
   router.replace("/" as any);
 }} style={s.backBtn}>
             <Ionicons name="arrow-back" size={18} color="#0f172a" />

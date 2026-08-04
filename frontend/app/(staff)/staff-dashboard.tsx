@@ -1,9 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { onAuthStateChanged } from "firebase/auth";
-import {
-  doc,
-  getDoc,
-} from "firebase/firestore";
+
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -34,7 +30,6 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { auth, db } from "../../firebase/firebaseConfig";
 import { authAPI, complaintsAPI } from "../../services/api";
 
 import { useLoadingStore } from "@/store/loadingStore";
@@ -390,46 +385,7 @@ useEffect(() => {
 
     bootstrap();
 
- const unsub = onAuthStateChanged(auth, async (u) => {
-if (!u) {
-        const netState = await NetInfo.fetch();
-        const online = !!(netState.isConnected && netState.isInternetReachable);
-
-        if (!online && hasBootstrapped.current) {
-          // Offline and bootstrap already loaded from SQLite — do nothing.
-          return;
-        }
-
-        router.replace("/login" as any);
-        return;
-      }
-      if (hasBootstrapped.current) {
-        // Bootstrap already handled SQLite load. Update profile in background only.
-        getDoc(doc(db, "users", u.uid)).then((snap) => {
-          if (snap.exists()) {
-            const data = snap.data() as StaffData;
-            setStaffData(data);
-            AsyncStorage.setItem(`user_${u.uid}`, JSON.stringify(data));
-          }
-        }).catch(() => {});
-        return;
-      }
-      // Firebase resolved before bootstrap finished (rare) — run full init.
-      hasBootstrapped.current = true;
-      setStaffUid(u.uid);
-      const snap = await getDoc(doc(db, "users", u.uid));
-      if (snap.exists()) {
-        const data = snap.data() as StaffData;
-        setStaffData(data);
-        AsyncStorage.setItem(`user_${u.uid}`, JSON.stringify(data));
-      }
-      subscribeToComplaints(u.uid);
-      refetchAll(u.uid, true, true);
-      registerPushToken();
-    });
-
-    return () => {
-      unsub();
+return () => {
       if (unsubRef.current) unsubRef.current();
     };
   }, [router, subscribeToComplaints, registerPushToken, refetchAll]);

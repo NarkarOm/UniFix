@@ -3,8 +3,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -20,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { auth, db } from "../../firebase/firebaseConfig";
+import { authAPI } from "../../services/api";
 const CLOUDINARY_CLOUD = "dcizaxjul";
 const CLOUDINARY_PRESET = "unifix_upload";
 const CLOUDINARY_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/auto/upload`;
@@ -303,7 +301,7 @@ const gst = StyleSheet.create({
 });
 
 export default function CompleteProfileScreen() {
-  const [user, setUser] = useState<User | null>(null);
+const [uid, setUid] = useState<string | null>(null);
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -325,24 +323,22 @@ export default function CompleteProfileScreen() {
   const [certificate, setCertificate] = useState<FileItem>(null);
   const [teacherIdCard, setTeacherIdCard] = useState<FileItem>(null);
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (!u) {
+useEffect(() => {
+    AsyncStorage.getItem("unifix_access_token").then(async (token) => {
+      if (!token) {
         router.replace("/login" as any);
         return;
       }
-      setUser(u);
       try {
-        const snap = await getDoc(doc(db, "users", u.uid));
-        if (snap.exists()) {
-          const data = snap.data();
-          setRole(data.role || "");
-          if (data.role === "staff") {
-            if (data.verificationStatus === "pending" && data.profileCompleted)
-              setPendingApproval(true);
-            else if (data.verificationStatus === "rejected")
-              setRejectionMessage(data.rejectionMessage || "");
-          }
+        const res = await authAPI.myProfile();
+        const data = res.profile;
+        setUid(data.id);
+        setRole(data.role || "");
+        if (data.role === "staff") {
+          if (data.verificationStatus === "pending" && data.profileCompleted)
+            setPendingApproval(true);
+          else if (data.verificationStatus === "rejected")
+            setRejectionMessage(data.rejectionMessage || "");
         }
       } catch {
         setError("Failed to load profile data.");
@@ -350,7 +346,6 @@ export default function CompleteProfileScreen() {
         setLoading(false);
       }
     });
-    return () => unsub();
   }, []);
 
   const pickImage = async (setter: (f: FileItem) => void) => {
@@ -422,7 +417,7 @@ export default function CompleteProfileScreen() {
       if (!certificate)
         return setError("Please upload your employee certificate.");
     }
-    if (!user) return;
+if (!uid) return;
     setSaving(true);
     try {
       const updateData: Record<string, any> = {
@@ -483,47 +478,39 @@ export default function CompleteProfileScreen() {
         updateData.verificationStatus = "pending";
         updateData.rejectionMessage = null;
       }
-      await updateDoc(doc(db, "users", user.uid), updateData);
+const token = await AsyncStorage.getItem("unifix_access_token");
+      await fetch(`${process.env.EXPO_PUBLIC_BASE_URL}/auth/complete-profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(updateData),
+      });
 
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        let route = "/";
-        if (role === "staff") {
-          route = "/complete-profile";
-        } else if (role === "student" || role === "teacher") {
-          route = "/";
-        }
-
-        await AsyncStorage.setItem(
-          "unifix_cached_user",
-          JSON.stringify({
-            uid: currentUser.uid,
-            role: role,
-            route: route,
-            cachedAt: Date.now(),
-          }),
-        );
+      let route = "/";
+      if (role === "staff") {
+        route = "/complete-profile";
       }
 
-  if (role === "staff") {
-        // Notify admin about new staff signup
+      await AsyncStorage.setItem(
+        "unifix_cached_user",
+        JSON.stringify({
+          uid,
+          role,
+          route,
+          cachedAt: Date.now(),
+        }),
+      );
+
+      if (role === "staff") {
         try {
-          const currentUser = auth.currentUser;
-          if (currentUser) {
-            const token = await currentUser.getIdToken();
-            await fetch(`${process.env.EXPO_PUBLIC_BASE_URL}/auth/notify-staff-signup`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-            });
-          }
+          await fetch(`${process.env.EXPO_PUBLIC_BASE_URL}/auth/notify-staff-signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          });
         } catch {}
         setPendingApproval(true);
       } else {
         router.replace("/" as any);
-      }
+      } 
     } catch {
       setError("Failed to save profile. Please try again.");
     } finally {
@@ -601,7 +588,7 @@ export default function CompleteProfileScreen() {
           <TouchableOpacity
             style={s.backToLoginBtn}
             onPress={async () => {
-              await auth.signOut();
+             await AsyncStorage.multiRemove(["unifix_access_token", "unifix_refresh_token", "unifix_cached_user"]);
               router.replace("/login" as any);
             }}
             activeOpacity={0.85}

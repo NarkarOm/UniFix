@@ -1,120 +1,159 @@
 import { useState } from 'react'
 import { X, Eye, CreditCard, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { useTheme } from '../theme/ThemeProvider'
 import { adminAPI } from '../services/api'
-import { formatDateShort} from '../utils/dateUtils'
+import { formatDateShort } from '../utils/dateUtils'
 import { EmptyState, SectionHeader } from '../components/SharedComponents'
 
 export default function IdCardsSection({ requests, loading, onRefresh }) {
-  const [actionLoading, setActionLoading] = useState(null);
-  const [rejectModal, setRejectModal] = useState(null);
-  const [rejectReason, setRejectReason] = useState('');
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const { tokens } = useTheme()
+  const [actionLoading, setActionLoading] = useState(null)
+  const [rejectModal, setRejectModal] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [previewUrl, setPreviewUrl] = useState(null)
 
-  const pendingRequests = requests.filter(r => r.status === 'pending');
-  const processedRequests = requests.filter(r => r.status !== 'pending');
+  const pendingRequests = requests.filter(r => r.status === 'pending')
+  const processedRequests = requests.filter(r => r.status !== 'pending')
 
-const handleApprove = async (requestId) => {
-    setActionLoading(requestId);
-    try {
-      await adminAPI.approveIdCard(requestId);
-      onRefresh();
-    } catch {
-      // Catch block
-    } finally {
-      setActionLoading(null);
-    }
-  };
+  const handleApprove = async (requestId) => {
+    setActionLoading(requestId)
+    try { await adminAPI.approveIdCard(requestId); onRefresh() }
+    catch {} finally { setActionLoading(null) }
+  }
 
   const handleReject = async () => {
-    if (!rejectModal) return;
-    setActionLoading(rejectModal);
+    if (!rejectModal) return
+    setActionLoading(rejectModal)
     try {
-      await adminAPI.rejectIdCard(rejectModal, rejectReason);
-      setRejectModal(null);
-      setRejectReason('');
-      onRefresh();
-    } catch {
-        //Catch block
-    } finally {
-      setActionLoading(null);
-    }
-  };
+      await adminAPI.rejectIdCard(rejectModal, rejectReason)
+      setRejectModal(null)
+      setRejectReason('')
+      onRefresh()
+    } catch {} finally { setActionLoading(null) }
+  }
+
+  const statusPill = (status) => ({
+    approved: { bg: tokens.successBg, color: tokens.success, border: tokens.successBorder, label: 'Approved', dot: tokens.success },
+    rejected: { bg: tokens.dangerBg, color: tokens.danger, border: tokens.dangerBorder, label: 'Rejected', dot: tokens.danger },
+    pending: { bg: tokens.warningBg, color: tokens.warning, border: tokens.warningBorder, label: 'Pending', dot: tokens.warning },
+  }[status] ?? { bg: tokens.surfaceHigh, color: tokens.textMuted, border: tokens.border, label: status, dot: tokens.textMuted })
 
   return (
     <div>
       <SectionHeader title="ID Card Requests" subtitle="Review and approve or reject ID card update requests from students and teachers" />
-      {loading ? <div className="p-[60px] text-center text-[#94a3b8] text-[14px]">Loading…</div>
-        : pendingRequests.length === 0 ? <EmptyState icon={CreditCard} text="No pending ID card requests" sub="All requests have been processed" />
-          : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px] mb-[32px]">
-              {pendingRequests.map(req => (
-                <div key={req.id} className="bg-white rounded-[14px] overflow-hidden border-[1.5px] border-[#fde68a]">
-                  <div className="p-[13px_16px] flex items-center gap-[10px] border-b border-[#fef3c7]">
-                    <div className="w-[36px] h-[36px] rounded-[9px] flex items-center justify-center shrink-0 bg-[#fef3c7]"><CreditCard size={18} color="#d97706" /></div>
-                    <div className="flex-1">
-                      <div className="text-[14px] font-bold text-[#0f172a]">{req.fullName}</div>
-                      <div className="text-[11px] text-[#94a3b8]">{req.email} · {req.role}</div>
-                    </div>
-                    <span className="inline-flex items-center gap-[5px] text-[11px] font-bold px-[10px] py-[3px] rounded-[20px] whitespace-nowrap border bg-[#fef3c7] text-[#d97706] border-[#fde68a]">
-                      <span className="w-[5px] h-[5px] rounded-full shrink-0 bg-[#f59e0b]" />Pending
-                    </span>
+
+      {loading ? (
+        <div style={{ padding: 60, textAlign: 'center', color: tokens.textMuted, fontSize: 14 }}>Loading…</div>
+      ) : pendingRequests.length === 0 ? (
+        <EmptyState icon={CreditCard} text="No pending ID card requests" sub="All requests have been processed" />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16, marginBottom: 32 }}>
+          {pendingRequests.map(req => {
+            const pill = statusPill('pending')
+            return (
+              <div key={req.id} style={{
+                background: tokens.surface, borderRadius: tokens.radius.xl,
+                border: `1.5px solid ${tokens.warningBorder}`, overflow: 'hidden',
+                boxShadow: tokens.shadow,
+              }}>
+                <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${tokens.warningBorder}`, background: tokens.warningBg }}>
+                  <div style={{ width: 36, height: 36, borderRadius: tokens.radius.lg, background: tokens.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <CreditCard size={18} color={tokens.warning} />
                   </div>
-                  <div className="p-[15px]">
-                    {req.newIdCardUrl && (
-                      <div className="mb-[12px]">
-                        <div className="text-[10px] font-bold text-[#94a3b8] uppercase tracking-[0.6px] mb-[8px]">New ID Card</div>
-                        <div className="relative cursor-pointer rounded-[8px] overflow-hidden border border-[#e2e8f0] group" onClick={() => setPreviewUrl(req.newIdCardUrl)}>
-                          <img src={req.newIdCardUrl} alt="New ID" className="w-full h-[150px] object-contain bg-[#f9fafb] block" />
-                          <div className="absolute inset-0 bg-transparent flex items-center justify-center text-white text-[13px] font-bold gap-[5px] transition-colors duration-150 group-hover:bg-black/30"><Eye size={13} /> Preview</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: tokens.text }}>{req.fullName}</div>
+                    <div style={{ fontSize: 11, color: tokens.textMuted }}>{req.email} · {req.role}</div>
+                  </div>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: tokens.radius.pill, background: pill.bg, color: pill.color, border: `1px solid ${pill.border}`, whiteSpace: 'nowrap' }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: pill.dot }} /> Pending
+                  </span>
+                </div>
+
+                <div style={{ padding: 15 }}>
+                  {req.newIdCardUrl && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>New ID Card</div>
+                      <div style={{ position: 'relative', cursor: 'pointer', borderRadius: tokens.radius.lg, overflow: 'hidden', border: `1px solid ${tokens.border}` }} onClick={() => setPreviewUrl(req.newIdCardUrl)}>
+                        <img src={req.newIdCardUrl} alt="New ID" style={{ width: '100%', height: 150, objectFit: 'contain', background: tokens.surfaceLow, display: 'block' }} />
+                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700, gap: 5, transition: 'background 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.3)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0)'}
+                        >
+                          <Eye size={13} /> Preview
                         </div>
                       </div>
-                    )}
-                    <div className="text-[11px] text-[#94a3b8] mb-[12px]">Requested: {formatDateShort(req.requestedAt)}</div>
-                    <div className="flex gap-[9px]">
-                      <button className="flex-1 bg-[#16a34a] text-white rounded-[9px] p-[9px] text-[13px] font-bold cursor-pointer border-none transition-all duration-150 flex items-center justify-center gap-[6px] hover:bg-[#15803d] disabled:opacity-55 disabled:cursor-not-allowed" onClick={() => handleApprove(req.id)} disabled={actionLoading === req.id}>
-                        {actionLoading === req.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Approve
-                      </button>
-                      <button className="flex-1 bg-white text-[#dc2626] rounded-[9px] p-[9px] text-[13px] font-bold cursor-pointer border-[1.5px] border-[#fecaca] transition-all duration-150 flex items-center justify-center gap-[6px] hover:bg-[#fef2f2]" onClick={() => { setRejectModal(req.id); setRejectReason('') }}>
-                        <XCircle size={14} /> Reject
-                      </button>
                     </div>
+                  )}
+                  <div style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 12 }}>Requested: {formatDateShort(req.requestedAt)}</div>
+                  <div style={{ display: 'flex', gap: 9 }}>
+                    <button
+                      onClick={() => handleApprove(req.id)}
+                      disabled={actionLoading === req.id}
+                      style={{ flex: 1, background: tokens.success, color: '#fff', borderRadius: tokens.radius.lg, padding: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit', opacity: actionLoading === req.id ? 0.55 : 1 }}
+                    >
+                      {actionLoading === req.id ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle2 size={14} />} Approve
+                    </button>
+                    <button
+                      onClick={() => { setRejectModal(req.id); setRejectReason('') }}
+                      style={{ flex: 1, background: tokens.surface, color: tokens.danger, borderRadius: tokens.radius.lg, padding: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', border: `1.5px solid ${tokens.dangerBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit' }}
+                    >
+                      <XCircle size={14} /> Reject
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {processedRequests.length > 0 && (
         <>
-          <div className="text-[13px] font-bold text-[#374151] mb-[13px] mt-[4px]">Processed Requests</div>
-          <div className="flex flex-col gap-[7px]">
-            {processedRequests.map(req => (
-              <div key={req.id} className="bg-white rounded-[9px] border border-[#f0f0f0] p-[11px_14px] flex items-center gap-[12px]">
-                <div className="flex-1 min-w-0"><span className="text-[13px] font-semibold text-[#374151]">{req.fullName}</span><span className="text-[12px] text-[#94a3b8] ml-[8px]">{req.email}</span></div>
-                <span className="text-[11px] text-[#94a3b8]">{formatDateShort(req.processedAt)}</span>
-                <span className="inline-flex items-center gap-[5px] text-[11px] font-bold px-[10px] py-[3px] rounded-[20px] whitespace-nowrap border" style={req.status === 'approved' ? { background: '#d1fae5', color: '#059669', borderColor: '#6ee7b7' } : { background: '#fee2e2', color: '#dc2626', borderColor: '#fca5a5' }}>
-                  <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: req.status === 'approved' ? '#10b981' : '#ef4444' }} />
-                  {req.status === 'approved' ? 'Approved' : 'Rejected'}
-                </span>
-              </div>
-            ))}
+          <div style={{ fontSize: 13, fontWeight: 700, color: tokens.text, marginBottom: 13 }}>Processed Requests</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {processedRequests.map(req => {
+              const pill = statusPill(req.status)
+              return (
+                <div key={req.id} style={{ background: tokens.surface, borderRadius: tokens.radius.lg, border: `1px solid ${tokens.border}`, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: tokens.textSecondary }}>{req.fullName}</span>
+                    <span style={{ fontSize: 12, color: tokens.textMuted, marginLeft: 8 }}>{req.email}</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: tokens.textMuted }}>{formatDateShort(req.processedAt)}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: tokens.radius.pill, background: pill.bg, color: pill.color, border: `1px solid ${pill.border}`, whiteSpace: 'nowrap' }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: pill.dot }} /> {pill.label}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </>
       )}
 
       {rejectModal && (
-        <div className="fixed inset-0 bg-[#0f172a]/60 flex items-center justify-center z-[200] p-[20px] backdrop-blur-[2px]" onClick={() => setRejectModal(null)}>
-          <div className="bg-white rounded-[20px] w-full max-w-[460px] max-h-[90vh] flex flex-col shadow-[0_30px_80px_rgba(0,0,0,0.22)] overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center p-[18px_22px] border-b border-[#f3f4f6] shrink-0">
-              <div><div className="text-[15px] font-extrabold text-[#0f172a]">Reject ID Card Request</div><div className="text-[12px] text-[#94a3b8] mt-[2px]">Optionally provide a reason</div></div>
-              <button className="w-[32px] h-[32px] rounded-[8px] bg-[#f3f4f6] border-none cursor-pointer flex items-center justify-center text-[#374151] hover:bg-[#fee2e2] hover:text-[#dc2626]" onClick={() => setRejectModal(null)}><X size={14} /></button>
+        <div style={{ position: 'fixed', inset: 0, background: tokens.modalOverlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20, backdropFilter: 'blur(2px)' }} onClick={() => setRejectModal(null)}>
+          <div style={{ background: tokens.surface, borderRadius: tokens.radius.xxl, width: '100%', maxWidth: 460, boxShadow: tokens.shadowModal, border: `1px solid ${tokens.border}`, overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${tokens.border}` }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: tokens.text }}>Reject ID Card Request</div>
+                <div style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>Optionally provide a reason</div>
+              </div>
+              <button onClick={() => setRejectModal(null)} style={{ width: 30, height: 30, borderRadius: tokens.radius.md, background: tokens.surfaceHigh, border: `1px solid ${tokens.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: tokens.textSecondary }}>
+                <X size={14} />
+              </button>
             </div>
-            <div className="p-[22px]">
-              <textarea className="w-full rounded-[10px] border-[1.5px] border-[#e2e8f0] p-[12px] text-[14px] text-[#374151] min-h-[80px] resize-y outline-none focus:border-[#16a34a] font-['DM_Sans']" value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Reason (optional)…" />
-              <div className="flex gap-[9px] mt-[14px]">
-                <button className="flex-1 bg-[#f8fafc] text-[#374151] border-[1.5px] border-[#e2e8f0] rounded-[9px] p-[10px] text-[13px] font-bold cursor-pointer transition-all duration-150 hover:border-[#16a34a] hover:text-[#16a34a] hover:bg-[#f0fdf4]" onClick={() => setRejectModal(null)}>Cancel</button>
-                <button className="flex-1 bg-[#dc2626] text-white border-none rounded-[9px] p-[10px] text-[13px] font-bold cursor-pointer transition-all duration-150 hover:bg-[#b91c1c] disabled:opacity-55 disabled:cursor-not-allowed" onClick={handleReject} disabled={!!actionLoading}>
-                  {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />} Confirm Reject
+            <div style={{ padding: 20 }}>
+              <textarea
+                style={{ width: '100%', borderRadius: tokens.radius.lg, border: `1.5px solid ${tokens.inputBorder}`, padding: '11px 12px', fontSize: 14, color: tokens.text, background: tokens.inputBg, minHeight: 80, resize: 'vertical', outline: 'none', fontFamily: 'inherit' }}
+                value={rejectReason} onChange={e => setRejectReason(e.target.value)}
+                placeholder="Reason (optional)…"
+                onFocus={e => e.target.style.borderColor = tokens.inputFocus}
+                onBlur={e => e.target.style.borderColor = tokens.inputBorder}
+              />
+              <div style={{ display: 'flex', gap: 9, marginTop: 14 }}>
+                <button onClick={() => setRejectModal(null)} style={{ flex: 1, background: tokens.surfaceLow, color: tokens.textSecondary, border: `1.5px solid ${tokens.border}`, borderRadius: tokens.radius.lg, padding: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                <button onClick={handleReject} disabled={!!actionLoading} style={{ flex: 1, background: tokens.danger, color: '#fff', border: 'none', borderRadius: tokens.radius.lg, padding: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontFamily: 'inherit', opacity: !!actionLoading ? 0.55 : 1 }}>
+                  {actionLoading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <XCircle size={14} />} Confirm Reject
                 </button>
               </div>
             </div>
@@ -123,13 +162,22 @@ const handleApprove = async (requestId) => {
       )}
 
       {previewUrl && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[300] p-[20px]" onClick={() => setPreviewUrl(null)}>
-          <div className="bg-white rounded-[16px] overflow-hidden max-w-[90vw] max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center p-[14px_18px] border-b border-[#e5e7eb] shrink-0"><span className="text-[14px] font-bold">ID Card Preview</span><button className="w-[32px] h-[32px] rounded-[8px] bg-[#f3f4f6] border-none cursor-pointer flex items-center justify-center text-[#374151] hover:bg-[#fee2e2] hover:text-[#dc2626]" onClick={() => setPreviewUrl(null)}><X size={14} /></button></div>
-            <div className="overflow-auto"><img src={previewUrl} alt="Preview" className="max-w-[80vw] max-h-[80vh] object-contain block p-[8px]" /></div>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 20 }} onClick={() => setPreviewUrl(null)}>
+          <div style={{ background: tokens.surface, borderRadius: tokens.radius.xxl, overflow: 'hidden', maxWidth: '90vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${tokens.border}`, flexShrink: 0 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: tokens.text }}>ID Card Preview</span>
+              <button onClick={() => setPreviewUrl(null)} style={{ width: 30, height: 30, borderRadius: tokens.radius.md, background: tokens.surfaceHigh, border: `1px solid ${tokens.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: tokens.textSecondary }}>
+                <X size={14} />
+              </button>
+            </div>
+            <div style={{ overflow: 'auto' }}>
+              <img src={previewUrl} alt="Preview" style={{ maxWidth: '80vw', maxHeight: '80vh', objectFit: 'contain', display: 'block', padding: 8 }} />
+            </div>
           </div>
         </div>
       )}
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }

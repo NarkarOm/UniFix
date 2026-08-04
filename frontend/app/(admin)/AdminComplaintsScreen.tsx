@@ -1,4 +1,4 @@
-import { auth } from "@/firebase/firebaseConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -158,9 +158,8 @@ const fetchStaffDetails = useCallback(async () => {
     if (!r.uid) continue;
     try {
 const base = process.env.EXPO_PUBLIC_BASE_URL;
-      const user = auth.currentUser;
-      if (!user) continue;
-      const token = await user.getIdToken();
+const token = await AsyncStorage.getItem("unifix_access_token");
+      if (!token) continue;
 
       const res = await fetch(`${base}/admin/user/${r.uid}`, {
         headers: { Authorization: `Bearer ${token}` },

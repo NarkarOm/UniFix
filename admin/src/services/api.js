@@ -85,6 +85,60 @@ getAllLostReports: (clientHash) =>
   // getLostReportsHash: () =>
   //   axios.get(`${BASE_URL}/admin/lost-reports-hash`, { headers: authHeaders() }),
 
+forgotPassword: (email) =>
+    axios.post(`${BASE_URL}/auth/forgot-password`, { email }),
+
+  validateResetOtp: (email, otp) =>
+    axios.post(`${BASE_URL}/auth/validate-reset-otp`, { email, otp }),
+
+  verifyResetOtp: (email, otp, newPassword) =>
+    axios.post(`${BASE_URL}/auth/verify-reset-otp`, { email, otp, newPassword }),
+
+getMasterDataAdmin: () =>
+    axios.get(`${BASE_URL}/master/admin/all?_=${Date.now()}`, { headers: authHeaders() }),
+
+  createCategory: (data) =>
+    axios.post(`${BASE_URL}/master/categories`, data, { headers: authHeaders() }),
+  updateCategory: (id, data) =>
+    axios.put(`${BASE_URL}/master/categories/${id}`, data, { headers: authHeaders() }),
+  deleteCategory: (id) =>
+    axios.delete(`${BASE_URL}/master/categories/${id}`, { headers: authHeaders() }),
+
+  createSubCategory: (data) =>
+    axios.post(`${BASE_URL}/master/subcategories`, data, { headers: authHeaders() }),
+  updateSubCategory: (id, data) =>
+    axios.put(`${BASE_URL}/master/subcategories/${id}`, data, { headers: authHeaders() }),
+  deleteSubCategory: (id) =>
+    axios.delete(`${BASE_URL}/master/subcategories/${id}`, { headers: authHeaders() }),
+
+  createBuilding: (data) =>
+    axios.post(`${BASE_URL}/master/buildings`, data, { headers: authHeaders() }),
+  updateBuilding: (id, data) =>
+    axios.put(`${BASE_URL}/master/buildings/${id}`, data, { headers: authHeaders() }),
+  deleteBuilding: (id) =>
+    axios.delete(`${BASE_URL}/master/buildings/${id}`, { headers: authHeaders() }),
+
+  createFloor: (data) =>
+    axios.post(`${BASE_URL}/master/floors`, data, { headers: authHeaders() }),
+  updateFloor: (id, data) =>
+    axios.put(`${BASE_URL}/master/floors/${id}`, data, { headers: authHeaders() }),
+  deleteFloor: (id) =>
+    axios.delete(`${BASE_URL}/master/floors/${id}`, { headers: authHeaders() }),
+
+  createRoom: (data) =>
+    axios.post(`${BASE_URL}/master/rooms`, data, { headers: authHeaders() }),
+  updateRoom: (id, data) =>
+    axios.put(`${BASE_URL}/master/rooms/${id}`, data, { headers: authHeaders() }),
+  deleteRoom: (id) =>
+    axios.delete(`${BASE_URL}/master/rooms/${id}`, { headers: authHeaders() }),
+
+  createLFCategory: (data) =>
+    axios.post(`${BASE_URL}/master/lf-categories`, data, { headers: authHeaders() }),
+  updateLFCategory: (id, data) =>
+    axios.put(`${BASE_URL}/master/lf-categories/${id}`, data, { headers: authHeaders() }),
+  deleteLFCategory: (id) =>
+    axios.delete(`${BASE_URL}/master/lf-categories/${id}`, { headers: authHeaders() }),
+
   iwillHandle: (complaintId) =>
     axios.post(`${BASE_URL}/admin/iwillhandle`, { complaintId }, { headers: authHeaders() }),
 

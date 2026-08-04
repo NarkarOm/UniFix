@@ -3,10 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  doc,
-  getDoc,
-} from "firebase/firestore";
+
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -28,7 +25,6 @@ import {
 import { useLoadingStore } from "../../store/loadingStore";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { auth, db } from "../../firebase/firebaseConfig";
 import {
   authAPI,
   lostReportsAPI
@@ -390,6 +386,7 @@ const activeTabRef = useRef<TabType>(activeTab);
 
 
 
+const [currentUserId, setCurrentUserId] = useState<string>("");
   const router = useRouter();
 const params = useLocalSearchParams<{
     openTab?: string;
@@ -398,19 +395,17 @@ const params = useLocalSearchParams<{
     skeleton?: string;
   }>();
 
- useEffect(() => {
+useEffect(() => {
     if (params.openTab === "complaints") {
       setActiveTab("complaints");
-      // Force sync when coming from complaint submission
-      const u = auth.currentUser;
-      if (u) fetchComplaints(u.uid);
+      if (currentUserId) fetchComplaints(currentUserId);
     } else if (params.openTab === "lostfound") {
       setActiveTab("lostfound");
       if (params.openLFTab) {
         setLfActiveTab(params.openLFTab as LfActiveTab);
       }
     }
-  }, [params.openTab, params.openLFTab]);
+}, [params.openTab, params.openLFTab, currentUserId]);
 
 const appStateRef = useRef(AppState.currentState);
 const lastBgTime = useRef<number | null>(null);
@@ -421,7 +416,6 @@ const lastBgTime = useRef<number | null>(null);
   const [filterTab, setFilterTab] = useState<FilterTab>("all");
 
   const [userRole, setUserRole] = useState<string>("");
-  const [currentUserId, setCurrentUserId] = useState<string>("");
 
   const [refreshing, setRefreshing] = useState(false);
   const [imageViewerUri, setImageViewerUri] = useState<string | null>(null);
@@ -452,7 +446,7 @@ const fetchComplaints = useCallback(async (uid: string, silent = false) => {
   const lfUnsubRef = useRef<(() => void)[]>([]);
 
 const forceRefreshLostReports = useCallback(async () => {
-    const uid = auth.currentUser?.uid;
+    const uid = currentUserId;
     if (!uid) return;
     await syncLostReports(true);
     const reportsUpdated = await getLostReportsFromDb();
@@ -461,7 +455,7 @@ const forceRefreshLostReports = useCallback(async () => {
   }, []);
 
 const forceRefreshFeed = useCallback(async () => {
-    const uid = auth.currentUser?.uid;
+    const uid = currentUserId;
     if (!uid) return;
     // Clear feed hash so next sync does a full re-fetch
     const { setMeta } = await import("../../db/metadataDb");
@@ -565,12 +559,7 @@ const registerPushToken = useCallback(async () => {
           setLoadingOnce(false);
         }
 
-        // Use Firebase's live user if it's ready yet, otherwise fall back to
-        // the cached uid — matters right after an offline cold start, where
-        // Firebase hasn't finished restoring its session but our cache +
-        // SQLite data is already available.
-        const u = auth.currentUser;
-        const uid = u?.uid || cached?.uid;
+  const uid = cached?.uid;
         if (!uid) return;
 
         setCurrentUserId(uid);
@@ -592,34 +581,23 @@ const registerPushToken = useCallback(async () => {
           setUserLostReports(localReports.filter((r: any) => r.postedByUid === uid) as any);
         }
         if (localClaims.length > 0) setClaimItems(localClaims as any);
-        // Always dismiss skeleton here — after SQLite read attempt — regardless of
-        // whether SQLite had data. Matches Admin pattern. Network calls below are
-        // background only and must never re-show the skeleton.
-        setLoadingOnce(false);
-
-        if (!u || alreadyFetched) {
-          // Offline or already synced this session — stop here, cached data is shown.
+  if (alreadyFetched) {
           return;
         }
 
-        // First time this session — try a full profile refresh + sync.
-        // If this fails (e.g. offline), the cached profile + SQLite data
-        // loaded above stay on screen as-is.
         markLoaded("dashboard");
         try {
-          const snap = await getDoc(doc(db, "users", u.uid));
-          if (snap.exists()) {
-            const profile = snap.data() as UserData;
-            setUserData(profile);
-            setUserRole(profile.role || "");
-            saveUserCache(profile);
+          const res = await authAPI.myProfile();
+          if (res?.profile) {
+            setUserData(res.profile as any);
+            setUserRole(res.profile.role || "");
+            saveUserCache(res.profile);
           }
         } catch {
-          // offline or Firestore error — keep showing cached profile
         }
 
-        fetchComplaints(u.uid);
-        fetchLostFound(u.uid);
+        fetchComplaints(uid);
+        fetchLostFound(uid);
         await fetchProfile();
         await registerPushToken();
       } catch {
@@ -636,13 +614,11 @@ const registerPushToken = useCallback(async () => {
 
 
 useEffect(() => {
-    const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
+const sub = AppState.addEventListener("change", (next: AppStateStatus) => {
       if (appStateRef.current.match(/inactive|background/) && next === "active") {
-        const user = auth.currentUser;
-        if (user) {
-          // Always silent refresh — no skeleton, no loading, user sees existing data
-          fetchComplaints(user.uid, true);
-          fetchLostFound(user.uid, true);
+        if (currentUserId) {
+          fetchComplaints(currentUserId, true);
+          fetchLostFound(currentUserId, true);
         }
       }
       appStateRef.current = next;
@@ -690,15 +666,14 @@ const switchTab = useCallback((tab: TabType) => {
 const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      const user = auth.currentUser;
-      if (user) {
+      if (currentUserId) {
         if (activeTab === 'lostfound') {
-          await fetchLostFound(user.uid);
+          await fetchLostFound(currentUserId);
         } else if (activeTab === 'complaints') {
-          await fetchComplaints(user.uid);
+          await fetchComplaints(currentUserId);
         } else {
-          await fetchComplaints(user.uid);
-          await fetchLostFound(user.uid);
+          await fetchComplaints(currentUserId);
+          await fetchLostFound(currentUserId);
         }
       }
     } catch (err) {
@@ -723,7 +698,9 @@ const onRefresh = useCallback(async () => {
 const handleLogout = useCallback(async () => {
     setUserRole("");
     setLoading(false);
-    await auth.signOut();
+    try {
+      await authAPI.logoutAllDevices();
+    } catch {}
     await AsyncStorage.multiRemove([
       "unifix_cached_user",
       "unifix_active_tab",

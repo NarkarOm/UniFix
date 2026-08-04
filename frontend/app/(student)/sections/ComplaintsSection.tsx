@@ -15,7 +15,7 @@ import {
   View,
 } from "react-native";
 import { upsertComplaints } from "../../../db/complaintsDb";
-import { auth } from "../../../firebase/firebaseConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { complaintsAPI } from "../../../services/api";
 import { getStudentComplaintsFromDb } from "../../../sync/syncManager";
 
@@ -182,7 +182,8 @@ const pollComplaint = useCallback(async (id: string) => {
       await upsertComplaints([updated as any]);
       setSelectedComplaint(updated as any);
       if (onComplaintsRefreshed) {
-        const fresh = await getStudentComplaintsFromDb(auth.currentUser?.uid ?? "");
+       const cachedUser = JSON.parse((await AsyncStorage.getItem("unifix_cached_user")) || "{}");
+        const fresh = await getStudentComplaintsFromDb(cachedUser?.uid ?? "");
         onComplaintsRefreshed(fresh as any);
       }
     }
@@ -201,7 +202,8 @@ const updated = await complaintsAPI.getById(complaint.id);
         } catch {}
         setSelectedComplaint(updated as any);
         if (onComplaintsRefreshed) {
-          const fresh = await getStudentComplaintsFromDb(auth.currentUser?.uid ?? "");
+      const cachedUser = JSON.parse((await AsyncStorage.getItem("unifix_cached_user")) || "{}");
+        const fresh = await getStudentComplaintsFromDb(cachedUser?.uid ?? "");
           onComplaintsRefreshed(fresh as any);
         }
       }

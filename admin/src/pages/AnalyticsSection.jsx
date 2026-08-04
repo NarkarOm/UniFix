@@ -4,9 +4,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   LineChart, Line,
 } from 'recharts'
-import { CATEGORY } from '../constants'
-import { SectionHeader } from '../components/SharedComponents'
 import { TrendingUp, Clock, AlertTriangle, Award, Activity } from 'lucide-react'
+import { useTheme } from '../theme/ThemeProvider'
+import { SectionHeader } from '../components/SharedComponents'
+import { CATEGORY } from '../constants'
 
 const HOURS = Array.from({ length: 24 }, (_, i) => {
   if (i === 0) return '12a'
@@ -20,21 +21,6 @@ function toMs(ts) {
   if (ts.toDate) return ts.toDate().getTime()
   if (ts._seconds) return ts._seconds * 1000
   return new Date(ts).getTime()
-}
-
-function StatCard({ icon: Icon, label, value, sub, color }) {
-  return (
-    <div className="bg-white rounded-[14px] p-[18px_16px] border border-[#f0f0f0]">
-      <div className="flex items-center gap-[10px] mb-[12px]">
-        <div className="w-[36px] h-[36px] rounded-[10px] flex items-center justify-center" style={{ background: color + '18' }}>
-          <Icon size={16} color={color} />
-        </div>
-        <span className="text-[11px] font-bold text-[#94a3b8] tracking-[0.6px] uppercase">{label}</span>
-      </div>
-      <div className="text-[28px] font-extrabold leading-none tracking-[-1px] text-[#0f172a] mb-[6px]">{value}</div>
-      <div className="text-[12px] font-semibold text-[#64748b]">{sub}</div>
-    </div>
-  )
 }
 
 const CustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
@@ -51,6 +37,8 @@ const CustomPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent })
 }
 
 export default function AnalyticsSection({ complaints, loading }) {
+  const { tokens } = useTheme()
+
   const categoryData = useMemo(() => {
     const counts = {}
     complaints.forEach(c => {
@@ -117,8 +105,7 @@ export default function AnalyticsSection({ complaints, loading }) {
     complaints.forEach(c => {
       const ms = toMs(c.createdAt)
       if (!ms) return
-      const hour = new Date(ms).getHours()
-      counts[hour]++
+      counts[new Date(ms).getHours()]++
     })
     return counts.map((count, i) => ({ hour: HOURS[i], count }))
   }, [complaints])
@@ -145,45 +132,72 @@ export default function AnalyticsSection({ complaints, loading }) {
     return max.count > 0 ? max.hour : 'N/A'
   }, [peakHours])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[300px] text-[#94a3b8] text-[14px]">Loading analytics…</div>
-    )
+  const panelStyle = {
+    background: tokens.surface, border: `1px solid ${tokens.border}`,
+    borderRadius: tokens.radius.xxl, padding: 20, boxShadow: tokens.shadow,
   }
+
+  const tooltipStyle = {
+    contentStyle: {
+      background: tokens.surface, border: `1px solid ${tokens.border}`,
+      borderRadius: 8, fontSize: 12, color: tokens.text, boxShadow: tokens.shadowMd,
+    },
+  }
+
+  const statCards = [
+    { icon: Activity, label: 'Total Complaints', value: complaints.length, sub: 'All time', color: tokens.purple },
+    { icon: Clock, label: 'Avg Resolution', value: avgResolutionTime, sub: 'Accepted → Completed', color: tokens.info },
+    { icon: AlertTriangle, label: 'Escalation Rate', value: escalationRate, sub: 'Flagged complaints', color: tokens.danger },
+    { icon: TrendingUp, label: 'Peak Hour', value: peakHour, sub: 'Most complaints submitted', color: tokens.warning },
+  ]
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300, color: tokens.textMuted, fontSize: 14 }}>
+      Loading analytics…
+    </div>
+  )
 
   return (
     <div>
       <SectionHeader title="Analytics" subtitle="Performance insights and complaint trends across campus." />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-[12px] mb-[20px]">
-        <StatCard icon={Activity} label="Total Complaints" value={complaints.length} sub="All time" color="#6366f1" />
-        <StatCard icon={Clock} label="Avg Resolution" value={avgResolutionTime} sub="Accepted → Completed" color="#0ea5e9" />
-        <StatCard icon={AlertTriangle} label="Escalation Rate" value={escalationRate} sub="Flagged complaints" color="#ef4444" />
-        <StatCard icon={TrendingUp} label="Peak Hour" value={peakHour} sub="Most complaints submitted" color="#f59e0b" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+        {statCards.map(card => (
+          <div key={card.label} style={{ ...panelStyle, padding: '18px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <div style={{ width: 36, height: 36, borderRadius: tokens.radius.lg, background: card.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <card.icon size={16} color={card.color} />
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: tokens.textMuted, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{card.label}</span>
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: tokens.text, letterSpacing: '-0.04em', marginBottom: 5 }}>{card.value}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: tokens.textMuted }}>{card.sub}</div>
+          </div>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px] mb-[16px]">
-        <div className="bg-white rounded-[16px] border border-[#f0f0f0] p-[20px]">
-          <div className="text-[13px] font-bold text-[#0f172a] mb-[4px]">Complaints by Category</div>
-          <div className="text-[11px] text-[#94a3b8] mb-[16px]">Distribution across all complaint types</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginBottom: 16 }}>
+        <div style={panelStyle}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: tokens.text, marginBottom: 4 }}>Complaints by Category</div>
+          <div style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 16 }}>Distribution across all complaint types</div>
           {categoryData.length === 0 ? (
-            <div className="flex items-center justify-center h-[220px] text-[#94a3b8] text-[13px]">No data</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 220, color: tokens.textMuted, fontSize: 13 }}>No data</div>
           ) : (
-            <div className="flex gap-[16px] items-center">
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
               <ResponsiveContainer width="55%" height={220}>
                 <PieChart>
                   <Pie data={categoryData} cx="50%" cy="50%" outerRadius={90} dataKey="value" labelLine={false} label={CustomPieLabel}>
                     {categoryData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
-                  <Tooltip formatter={(v, n) => [v, n]} contentStyle={{ borderRadius: 10, border: '1px solid #f0f0f0', fontSize: 12 }} />
+                  <Tooltip {...tooltipStyle} formatter={(v, n) => [v, n]} />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="flex flex-col gap-[8px] flex-1">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
                 {categoryData.map((d, i) => (
-                  <div key={i} className="flex items-center gap-[8px]">
-                    <div className="w-[10px] h-[10px] rounded-full shrink-0" style={{ background: d.color }} />
-                    <span className="text-[12px] text-[#374151] flex-1 truncate">{d.name}</span>
-                    <span className="text-[12px] font-bold text-[#0f172a]">{d.value}</span>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: tokens.textSecondary, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: tokens.text }}>{d.value}</span>
                   </div>
                 ))}
               </div>
@@ -191,76 +205,80 @@ export default function AnalyticsSection({ complaints, loading }) {
           )}
         </div>
 
-        <div className="bg-white rounded-[16px] border border-[#f0f0f0] p-[20px]">
-          <div className="text-[13px] font-bold text-[#0f172a] mb-[4px]">Monthly Trend</div>
-          <div className="text-[11px] text-[#94a3b8] mb-[16px]">Submitted vs resolved over last 6 months</div>
+        <div style={panelStyle}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: tokens.text, marginBottom: 4 }}>Monthly Trend</div>
+          <div style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 16 }}>Submitted vs resolved over last 6 months</div>
           {monthlyTrend.length === 0 ? (
-            <div className="flex items-center justify-center h-[220px] text-[#94a3b8] text-[13px]">No data</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 220, color: tokens.textMuted, fontSize: 13 }}>No data</div>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={monthlyTrend} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-                <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #f0f0f0', fontSize: 12 }} />
-                <Line type="monotone" dataKey="submitted" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} name="Submitted" />
-                <Line type="monotone" dataKey="resolved" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Resolved" />
+                <CartesianGrid strokeDasharray="3 3" stroke={tokens.chartGrid} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: tokens.textMuted }} />
+                <YAxis tick={{ fontSize: 11, fill: tokens.textMuted }} />
+                <Tooltip {...tooltipStyle} />
+                <Line type="monotone" dataKey="submitted" stroke={tokens.primary} strokeWidth={2} dot={{ r: 3 }} name="Submitted" />
+                <Line type="monotone" dataKey="resolved" stroke={tokens.success} strokeWidth={2} dot={{ r: 3 }} name="Resolved" />
               </LineChart>
             </ResponsiveContainer>
           )}
         </div>
       </div>
 
-      <div className="bg-white rounded-[16px] border border-[#f0f0f0] p-[20px] mb-[16px]">
-        <div className="text-[13px] font-bold text-[#0f172a] mb-[4px]">Peak Complaint Hours</div>
-        <div className="text-[11px] text-[#94a3b8] mb-[16px]">Number of complaints submitted by hour of day</div>
+      <div style={{ ...panelStyle, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: tokens.text, marginBottom: 4 }}>Peak Complaint Hours</div>
+        <div style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 16 }}>Number of complaints submitted by hour of day</div>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={peakHours} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#94a3b8' }} interval={1} />
-            <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} />
-            <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #f0f0f0', fontSize: 12 }} />
-            <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} name="Complaints" />
+            <CartesianGrid strokeDasharray="3 3" stroke={tokens.chartGrid} />
+            <XAxis dataKey="hour" tick={{ fontSize: 10, fill: tokens.textMuted }} interval={1} />
+            <YAxis tick={{ fontSize: 11, fill: tokens.textMuted }} />
+            <Tooltip {...tooltipStyle} />
+            <Bar dataKey="count" fill={tokens.primary} radius={[4, 4, 0, 0]} name="Complaints" />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-white rounded-[16px] border border-[#f0f0f0] overflow-hidden">
-        <div className="flex items-center gap-[10px] p-[16px_22px] border-b border-[#f5f5f5]">
-          <Award size={16} color="#f59e0b" />
-          <span className="text-[14px] font-bold text-[#0f172a]">Staff Performance</span>
+      <div style={{ ...panelStyle, padding: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 20px', borderBottom: `1px solid ${tokens.border}` }}>
+          <Award size={16} color={tokens.warning} />
+          <span style={{ fontSize: 14, fontWeight: 700, color: tokens.text }}>Staff Performance</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr className="bg-[#fafafa]">
+              <tr style={{ background: tokens.tableHeadBg }}>
                 {['Rank', 'Staff Name', 'Assigned', 'Resolved', 'Success Rate', 'Avg Time'].map(h => (
-                  <th key={h} className="p-[10px_20px] text-left text-[10px] font-bold text-[#94a3b8] tracking-[0.6px] uppercase border-b border-[#f0f0f0] whitespace-nowrap">{h}</th>
+                  <th key={h} style={{ padding: '10px 18px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: tokens.textMuted, letterSpacing: '0.05em', textTransform: 'uppercase', borderBottom: `1px solid ${tokens.border}`, whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {staffPerformance.length === 0 ? (
-                <tr><td colSpan={6} className="p-[60px] text-center text-[#94a3b8] text-[14px]">No staff data</td></tr>
+                <tr><td colSpan={6} style={{ padding: 60, textAlign: 'center', color: tokens.textMuted, fontSize: 14 }}>No staff data</td></tr>
               ) : staffPerformance.map((s, i) => (
-                <tr key={s.name} className="hover:bg-[#fafafa] transition-colors duration-100">
-                  <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle">
-                    <div className={`w-[24px] h-[24px] rounded-full flex items-center justify-center text-[11px] font-bold ${i === 0 ? 'bg-[#fef3c7] text-[#d97706]' : i === 1 ? 'bg-[#f1f5f9] text-[#475569]' : i === 2 ? 'bg-[#fef3c7] text-[#92400e]' : 'bg-[#f8fafc] text-[#94a3b8]'}`}>
+                <tr key={s.name}
+                  onMouseEnter={e => e.currentTarget.style.background = tokens.tableRowHover}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  style={{ transition: 'background 0.1s' }}
+                >
+                  <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}` }}>
+                    <div style={{ width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, background: i === 0 ? tokens.warningBg : tokens.surfaceHigh, color: i === 0 ? tokens.warning : tokens.textMuted }}>
                       {i + 1}
                     </div>
                   </td>
-                  <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle text-[13px] font-semibold text-[#0f172a]">{s.name}</td>
-                  <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle text-[13px] text-[#374151]">{s.total}</td>
-                  <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle text-[13px] text-[#374151]">{s.resolved}</td>
-                  <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle">
-                    <div className="flex items-center gap-[8px]">
-                      <div className="flex-1 max-w-[80px] h-[6px] rounded-full bg-[#f1f5f9] overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${s.rate}%`, background: s.rate >= 80 ? '#10b981' : s.rate >= 50 ? '#f59e0b' : '#ef4444' }} />
+                  <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}`, fontSize: 13, fontWeight: 600, color: tokens.text }}>{s.name}</td>
+                  <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}`, fontSize: 13, color: tokens.textSecondary }}>{s.total}</td>
+                  <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}`, fontSize: 13, color: tokens.textSecondary }}>{s.resolved}</td>
+                  <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ flex: 1, maxWidth: 80, height: 6, borderRadius: 3, background: tokens.surfaceHigh, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', borderRadius: 3, width: `${s.rate}%`, background: s.rate >= 80 ? tokens.success : s.rate >= 50 ? tokens.warning : tokens.danger }} />
                       </div>
-                      <span className="text-[12px] font-bold" style={{ color: s.rate >= 80 ? '#10b981' : s.rate >= 50 ? '#f59e0b' : '#ef4444' }}>{s.rate}%</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: s.rate >= 80 ? tokens.success : s.rate >= 50 ? tokens.warning : tokens.danger }}>{s.rate}%</span>
                     </div>
                   </td>
-                  <td className="p-[13px_20px] border-b border-[#f9f9f9] align-middle text-[12px] text-[#94a3b8]">{s.avgTime > 0 ? `${s.avgTime}h` : '—'}</td>
+                  <td style={{ padding: '12px 18px', borderBottom: `1px solid ${tokens.border}`, fontSize: 12, color: tokens.textMuted }}>{s.avgTime > 0 ? `${s.avgTime}h` : '—'}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
-import { signInWithCustomToken } from "firebase/auth";
+
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { auth } from "../../firebase/firebaseConfig";
+
 import { authAPI } from "../../services/api";
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -34,37 +34,33 @@ export default function LoginScreen() {
     if (!password) return setError("Please enter your password.");
     setLoading(true);
     try {
-      const data = await authAPI.login(email.trim(), password);
-      await signInWithCustomToken(auth, data.token);
+const data = await authAPI.login(email.trim(), password);
+      await AsyncStorage.setItem("unifix_access_token", data.token);
+      await AsyncStorage.setItem("unifix_refresh_token", data.refreshToken);
 
       const userData = data.user;
-
-      const currentUser = auth.currentUser;
       let route = "/";
 
-if (userData.role === "admin") {
+      if (userData.role === "admin") {
         route = "/admin-dashboard";
-      } else if (
-        userData.role === "staff" &&
-        userData.verificationStatus === "approved"
-      ) {
+      } else if (userData.role === "staff" && userData.verificationStatus === "approved") {
         route = "/staff-dashboard";
       } else if (userData.profileCompleted) {
         route = "/";
       } else {
         route = "/complete-profile";
       }
-      if (currentUser) {
-        await AsyncStorage.setItem(
-          "unifix_cached_user",
-          JSON.stringify({
-            uid: currentUser.uid,
-            role: userData.role,
-            route: route,
-            cachedAt: Date.now(),
-          }),
-        );
-}
+
+      await AsyncStorage.setItem(
+        "unifix_cached_user",
+        JSON.stringify({
+          uid: userData.uid,
+          role: userData.role,
+          route: route,
+          cachedAt: Date.now(),
+        }),
+      );
+
       if ((global as any).__unifixShowRoleOverlay) {
         (global as any).__unifixShowRoleOverlay(userData.role);
       }

@@ -1,29 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { adminAPI } from '../services/api'
+import { useTheme } from '../theme/ThemeProvider'
 import {
-  ArrowLeft,
-  CheckCircle2,
-  XCircle,
-  Eye,
-  FileText,
-  AlertCircle,
-  Loader2,
-  X,
-  ShieldCheck,
-  IdCard,
-  // Info,
-  // User2,
-  Briefcase,
-  Phone,
-  Mail,
-  Clock,
-  Hash
-} from "lucide-react"
+  ArrowLeft, CheckCircle2, XCircle, Eye, FileText,
+  AlertCircle, Loader2, X, ShieldCheck, IdCard,
+  Briefcase, Phone, Mail, Clock, Hash,
+} from 'lucide-react'
 
 export default function StaffDetail() {
   const { uid } = useParams()
   const navigate = useNavigate()
+  const { tokens } = useTheme()
   const [staff, setStaff] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -44,12 +32,8 @@ export default function StaffDetail() {
         if (err.response?.status === 401) {
           localStorage.removeItem('unifix_admin_token')
           navigate('/login')
-        } else {
-          setError('Failed to load staff details.')
-        }
-      } finally {
-        setLoading(false)
-      }
+        } else { setError('Failed to load staff details.') }
+      } finally { setLoading(false) }
     }
     fetchStaff()
   }, [uid, navigate])
@@ -59,13 +43,11 @@ export default function StaffDetail() {
     setError('')
     try {
       await adminAPI.approveStaff(uid)
-      setSuccessMsg('Staff approved successfully! They will be notified via email.')
+      setSuccessMsg('Staff approved successfully. They will be notified via email.')
       setStaff(prev => ({ ...prev, verificationStatus: 'approved' }))
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to approve staff.')
-    } finally {
-      setActionLoading(false)
-    }
+    } finally { setActionLoading(false) }
   }
 
   const handleReject = async () => {
@@ -81,42 +63,40 @@ export default function StaffDetail() {
       setRejectionText('')
     } catch (err) {
       setRejectionError(err.response?.data?.error || 'Failed to reject staff.')
-    } finally {
-      setActionLoading(false)
-    }
+    } finally { setActionLoading(false) }
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f4f6f8] font-['DM_Sans']">
-      <div className="text-center">
-        <div className="w-[60px] h-[60px] rounded-[16px] bg-[#f0fdf4] flex items-center justify-center mx-auto mb-[16px]">
-          <Loader2 size={28} color="#16a34a" className="animate-spin" />
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.bg }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 56, height: 56, borderRadius: tokens.radius.xl, background: tokens.primaryLight, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <Loader2 size={26} color={tokens.primary} style={{ animation: 'spin 1s linear infinite' }} />
         </div>
-        <div className="text-[#94a3b8] text-[14px] font-medium">Loading staff profile…</div>
+        <div style={{ color: tokens.textMuted, fontSize: 14, fontWeight: 500 }}>Loading staff profile…</div>
       </div>
     </div>
   )
 
   if (error && !staff) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f4f6f8] font-['DM_Sans']">
-      <div className="text-center">
-        <div className="w-[60px] h-[60px] rounded-[16px] bg-[#fef2f2] flex items-center justify-center mx-auto mb-[16px]">
-          <AlertCircle size={28} color="#dc2626" />
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.bg }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 56, height: 56, borderRadius: tokens.radius.xl, background: tokens.dangerBg, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+          <AlertCircle size={26} color={tokens.danger} />
         </div>
-        <div className="text-[#dc2626] text-[14px] font-medium mb-[18px]">{error}</div>
-        <button onClick={() => navigate('/')} className="bg-white text-[#374151] border-[1.5px] border-[#e2e8f0] rounded-[10px] p-[10px_20px] text-[14px] font-semibold cursor-pointer flex items-center gap-[7px] mx-auto transition-all hover:border-[#16a34a] hover:text-[#16a34a] hover:bg-[#f0fdf4]">
+        <div style={{ color: tokens.danger, fontSize: 14, fontWeight: 500, marginBottom: 18 }}>{error}</div>
+        <button onClick={() => navigate('/')} style={{ background: tokens.surface, color: tokens.textSecondary, border: `1.5px solid ${tokens.border}`, borderRadius: tokens.radius.lg, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, margin: '0 auto', fontFamily: 'inherit' }}>
           <ArrowLeft size={14} /> Back to Dashboard
         </button>
       </div>
     </div>
   )
 
-  const STATUS_STYLE = {
-    pending: { bg: '#fef3c7', color: '#d97706', border: '#fde68a' },
-    approved: { bg: '#d1fae5', color: '#059669', border: '#6ee7b7' },
-    rejected: { bg: '#fee2e2', color: '#dc2626', border: '#fca5a5' },
+  const statusStyles = {
+    pending: { bg: tokens.warningBg, color: tokens.warning, border: tokens.warningBorder },
+    approved: { bg: tokens.successBg, color: tokens.success, border: tokens.successBorder },
+    rejected: { bg: tokens.dangerBg, color: tokens.danger, border: tokens.dangerBorder },
   }
-  const sc = STATUS_STYLE[staff?.verificationStatus] ?? STATUS_STYLE.pending
+  const sc = statusStyles[staff?.verificationStatus] ?? statusStyles.pending
 
   const infoRows = [
     { label: 'Employee ID', value: staff?.employeeId, Icon: Hash },
@@ -132,134 +112,133 @@ export default function StaffDetail() {
     { title: 'Certificate / Proof', Icon: FileText, url: staff?.certificateUrl, fileName: staff?.certificateName },
   ]
 
+  const cardStyle = {
+    background: tokens.surface, borderRadius: tokens.radius.xxl,
+    border: `1px solid ${tokens.border}`, overflow: 'hidden', boxShadow: tokens.shadow,
+  }
+
   return (
-    <div className="sd-root min-h-screen bg-[#f4f6f8] font-['DM_Sans'] pb-[60px]">
-      <div className="sd-topbar bg-white border-b border-[#e9ecef] px-[28px] flex items-center justify-between h-[58px] sticky top-0 z-10">
-        <div className="sd-topbar-left flex items-center gap-[14px]">
-          <button className="sd-back-btn flex items-center gap-[6px] bg-[#f8fafc] border-[1.5px] border-[#e2e8f0] rounded-[8px] p-[7px_13px] text-[13px] font-semibold text-[#475569] cursor-pointer transition-all hover:border-[#16a34a] hover:text-[#16a34a] hover:bg-[#f0fdf4]" onClick={() => navigate('/')}>
+    <div style={{ minHeight: '100vh', background: tokens.bg, fontFamily: "'Inter', 'DM Sans', sans-serif", paddingBottom: 60 }}>
+      <header style={{ height: 56, background: tokens.headerBg, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', borderBottom: `1px solid ${tokens.headerBorder}`, position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <button onClick={() => navigate('/')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: tokens.surfaceHigh, border: `1.5px solid ${tokens.border}`, borderRadius: tokens.radius.md, padding: '7px 13px', fontSize: 13, fontWeight: 600, color: tokens.textSecondary, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}>
             <ArrowLeft size={13} /> Back
           </button>
-          <div className="sd-divider w-[1px] h-[22px] bg-[#e2e8f0]" />
-          <div className="sd-brand flex items-center gap-[9px]">
-            <div className="sd-brand-mark w-[30px] h-[30px] rounded-[8px] overflow-hidden">
-              <img src="/logo192.png" alt="logo" className="w-full h-full object-contain" />
-            </div>
-            <span className="sd-brand-name text-[14px] font-bold text-[#0f172a]">UniFiX Admin</span>
-          </div>
+          <div style={{ width: 1, height: 22, background: tokens.border }} />
+          <div style={{ fontSize: 14, fontWeight: 700, color: tokens.text }}>Staff Profile</div>
         </div>
-        <div className="sd-topbar-right flex items-center gap-[12px]">
-          <span className="sd-page-label text-[12px] text-[#94a3b8]">Staff Profile</span>
-          <span className="sd-status-pill text-[11px] font-bold p-[4px_12px] rounded-[20px] border flex items-center gap-[5px] tracking-[0.3px]" style={{ background: sc.bg, color: sc.color, borderColor: sc.border }}>
-            <span className="w-[5px] h-[5px] rounded-full shrink-0" style={{ background: sc.color }} />
-            {staff?.verificationStatus?.toUpperCase()}
-          </span>
-        </div>
-      </div>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: tokens.radius.pill, border: `1px solid ${sc.border}`, background: sc.bg, color: sc.color }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: sc.color }} />
+          {staff?.verificationStatus?.toUpperCase()}
+        </span>
+      </header>
 
-      <div className="sd-page max-w-[1020px] mx-auto p-[28px_24px]">
+      <div style={{ maxWidth: 1020, margin: '0 auto', padding: '28px 24px' }}>
         {successMsg && (
-          <div className="sd-alert success flex items-center gap-[9px] rounded-[10px] p-[12px_16px] text-[13px] font-medium mb-[20px] border border-[#6ee7b7] bg-[#d1fae5] text-[#065f46]">
-            <CheckCircle2 size={15} className="shrink-0" /> {successMsg}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, borderRadius: tokens.radius.lg, padding: '12px 16px', fontSize: 13, fontWeight: 500, marginBottom: 20, border: `1px solid ${tokens.successBorder}`, background: tokens.successBg, color: tokens.success }}>
+            <CheckCircle2 size={15} style={{ flexShrink: 0 }} /> {successMsg}
           </div>
         )}
         {error && (
-          <div className="sd-alert error flex items-center gap-[9px] rounded-[10px] p-[12px_16px] text-[13px] font-medium mb-[20px] border border-[#fecaca] bg-[#fef2f2] text-[#dc2626]">
-            <AlertCircle size={15} className="shrink-0" /> {error}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, borderRadius: tokens.radius.lg, padding: '12px 16px', fontSize: 13, fontWeight: 500, marginBottom: 20, border: `1px solid ${tokens.dangerBorder}`, background: tokens.dangerBg, color: tokens.danger }}>
+            <AlertCircle size={15} style={{ flexShrink: 0 }} /> {error}
           </div>
         )}
 
-        <div className="sd-grid grid grid-cols-1 md:grid-cols-[320px_1fr] gap-[20px] items-start">
-          <div className="sd-col flex flex-col gap-[16px]">
-            <div className="sd-card bg-white rounded-[16px] border border-[#f0f0f0] overflow-hidden shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-              <div className="sd-card-accent h-[5px]" style={{ background: 'linear-gradient(90deg, #16a34a, #15803d)' }} />
-              <div className="sd-card-body p-[22px]">
-                <div className="sd-profile-head flex items-center gap-[14px] mb-[20px]">
-                  <div className="sd-avatar w-[54px] h-[54px] rounded-[14px] bg-[#f0fdf4] border-[1.5px] border-[#bbf7d0] flex items-center justify-center text-[22px] font-extrabold text-[#16a34a] shrink-0">
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,320px) 1fr', gap: 20, alignItems: 'start' }} className="staff-grid">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={cardStyle}>
+              <div style={{ height: 5, background: `linear-gradient(90deg, ${tokens.primary}, ${tokens.primaryHover})` }} />
+              <div style={{ padding: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                  <div style={{ width: 54, height: 54, borderRadius: tokens.radius.xl, background: tokens.primaryLight, border: `1.5px solid ${tokens.primary}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: tokens.primary, flexShrink: 0 }}>
                     {staff?.fullName?.[0]?.toUpperCase() || '?'}
                   </div>
                   <div>
-                    <div className="sd-profile-name text-[17px] font-extrabold text-[#0f172a] mb-[3px]">{staff?.fullName}</div>
-                    <div className="sd-profile-role text-[12px] text-[#94a3b8]">{staff?.designation || 'Maintenance Staff'}</div>
+                    <div style={{ fontSize: 17, fontWeight: 800, color: tokens.text, marginBottom: 3 }}>{staff?.fullName}</div>
+                    <div style={{ fontSize: 12, color: tokens.textMuted }}>{staff?.designation || 'Maintenance Staff'}</div>
                   </div>
                 </div>
-                <div className="sd-info-rows flex flex-col">
-                  {infoRows.map(item => item.value ? (
-                    <div key={item.label} className="sd-info-row flex justify-between items-center py-[9px] border-b border-[#f9f9f9] last:border-none">
-                      <span className="sd-info-key flex items-center gap-[7px] text-[12px] text-[#94a3b8] font-medium">
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {infoRows.filter(i => i.value).map(item => (
+                    <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: `1px solid ${tokens.border}` }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: tokens.textMuted, fontWeight: 500 }}>
                         <item.Icon size={12} /> {item.label}
                       </span>
-                      <span className="sd-info-val text-[12px] text-[#374151] font-bold text-right max-w-[60%] break-words">{item.value}</span>
+                      <span style={{ fontSize: 12, color: tokens.textSecondary, fontWeight: 700, textAlign: 'right', maxWidth: '60%', wordBreak: 'break-words' }}>{item.value}</span>
                     </div>
-                  ) : null)}
+                  ))}
                 </div>
               </div>
             </div>
 
             {staff?.verificationStatus === 'rejected' && staff?.rejectionMessage && (
-              <div className="sd-rejection-box bg-[#fef2f2] border border-[#fecaca] rounded-[14px] p-[18px]">
-                <div className="sd-rejection-title flex items-center gap-[8px] text-[13px] font-bold text-[#dc2626] mb-[8px]">
+              <div style={{ background: tokens.dangerBg, border: `1px solid ${tokens.dangerBorder}`, borderRadius: tokens.radius.xl, padding: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, color: tokens.danger, marginBottom: 8 }}>
                   <XCircle size={14} /> Rejection Reason
                 </div>
-                <p className="sd-rejection-text text-[13px] text-[#7f1d1d] leading-[1.6]">{staff.rejectionMessage}</p>
+                <p style={{ fontSize: 13, color: tokens.danger, lineHeight: 1.6, opacity: 0.85 }}>{staff.rejectionMessage}</p>
               </div>
             )}
 
             {staff?.verificationStatus === 'pending' && (
-              <div className="sd-actions-card bg-white rounded-[14px] p-[20px] border border-[#f0f0f0] shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-                <div className="sd-actions-title text-[14px] font-bold text-[#0f172a] mb-[5px]">Admin Actions</div>
-                <p className="sd-actions-sub text-[12px] text-[#94a3b8] mb-[18px] leading-[1.5]">Review the documents carefully before taking action.</p>
-                <button className="sd-action-btn approve w-full rounded-[10px] p-[13px] text-[14px] font-bold cursor-pointer transition-all flex items-center justify-center gap-[8px] mb-[10px] bg-[#16a34a] text-white hover:not-disabled:bg-[#15803d] disabled:opacity-[0.65] disabled:cursor-not-allowed border-none" onClick={handleApprove} disabled={actionLoading}>
-                  {actionLoading ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                  Approve Staff
+              <div style={{ ...cardStyle, padding: 20 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: tokens.text, marginBottom: 5 }}>Admin Actions</div>
+                <p style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 18, lineHeight: 1.5 }}>Review the documents carefully before taking action.</p>
+                <button onClick={handleApprove} disabled={actionLoading} style={{ width: '100%', borderRadius: tokens.radius.lg, padding: 13, fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 10, background: tokens.success, color: '#fff', border: 'none', fontFamily: 'inherit', opacity: actionLoading ? 0.65 : 1 }}>
+                  {actionLoading ? <Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle2 size={15} />} Approve Staff
                 </button>
-                <button className="sd-action-btn reject w-full rounded-[10px] p-[13px] text-[14px] font-bold cursor-pointer transition-all flex items-center justify-center gap-[8px] bg-white text-[#dc2626] border-[1.5px] border-[#fecaca] hover:not-disabled:bg-[#fef2f2] disabled:opacity-[0.65] disabled:cursor-not-allowed" onClick={() => setRejectModal(true)} disabled={actionLoading}>
+                <button onClick={() => setRejectModal(true)} disabled={actionLoading} style={{ width: '100%', borderRadius: tokens.radius.lg, padding: 13, fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: tokens.surface, color: tokens.danger, border: `1.5px solid ${tokens.dangerBorder}`, fontFamily: 'inherit', opacity: actionLoading ? 0.65 : 1 }}>
                   <XCircle size={15} /> Reject & Notify
                 </button>
               </div>
             )}
 
             {staff?.verificationStatus === 'approved' && (
-              <div className="sd-approved-box bg-[#f0fdf4] rounded-[14px] p-[22px] border-[1.5px] border-[#bbf7d0] text-center">
-                <div className="sd-approved-icon w-[52px] h-[52px] rounded-full bg-[#16a34a] flex items-center justify-center mx-auto mb-[12px]">
+              <div style={{ background: tokens.successBg, borderRadius: tokens.radius.xl, padding: 22, border: `1.5px solid ${tokens.successBorder}`, textAlign: 'center' }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: tokens.success, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
                   <ShieldCheck size={24} color="#fff" />
                 </div>
-                <div className="sd-approved-title text-[15px] font-extrabold text-[#065f46] mb-[4px]">Approved & Active</div>
-                <div className="sd-approved-sub text-[12px] text-[#16a34a] leading-[1.5]">This staff member can now receive and manage complaints.</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: tokens.success, marginBottom: 4 }}>Approved & Active</div>
+                <div style={{ fontSize: 12, color: tokens.success, lineHeight: 1.5, opacity: 0.8 }}>This staff member can now receive and manage complaints.</div>
               </div>
             )}
           </div>
 
-          <div className="sd-col flex flex-col gap-[16px]">
-            <div className="sd-docs-card bg-white rounded-[16px] p-[22px] border border-[#f0f0f0] shadow-[0_1px_4px_rgba(0,0,0,0.04)]">
-              <div className="sd-docs-title text-[15px] font-extrabold text-[#0f172a] mb-[4px]">Uploaded Documents</div>
-              <p className="sd-docs-sub text-[12px] text-[#94a3b8] mb-[20px]">Click on any image to enlarge. PDFs will open in a new tab.</p>
-              <div className="sd-docs-grid grid grid-cols-1 sm:grid-cols-2 gap-[16px]">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ ...cardStyle, padding: 22 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: tokens.text, marginBottom: 4 }}>Uploaded Documents</div>
+              <p style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 20 }}>Click on any image to enlarge. PDFs will open in a new tab.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
                 {docs.map(doc => {
                   const isPdf = doc.fileName?.toLowerCase().endsWith('.pdf')
                   const hasDoc = !!doc.url
                   return (
-                    <div key={doc.title} className="sd-doc-item border-[1.5px] border-[#e2e8f0] rounded-[12px] overflow-hidden bg-[#fafafa]">
+                    <div key={doc.title} style={{ border: `1.5px solid ${tokens.border}`, borderRadius: tokens.radius.xl, overflow: 'hidden', background: tokens.surfaceLow }}>
                       {hasDoc && !isPdf ? (
-                        <div className="sd-doc-img-wrap relative h-[175px] cursor-pointer overflow-hidden group" onClick={() => setPreviewDoc({ url: doc.url, title: doc.title })}>
-                          <img src={doc.url} alt={doc.title} className="w-full h-full object-cover block" />
-                          <div className="sd-doc-img-overlay absolute inset-0 bg-transparent flex items-center justify-center text-white text-[13px] font-bold gap-[6px] transition-all group-hover:bg-black/35">
+                        <div style={{ position: 'relative', height: 175, cursor: 'pointer', overflow: 'hidden' }} onClick={() => setPreviewDoc({ url: doc.url, title: doc.title })}>
+                          <img src={doc.url} alt={doc.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 700, gap: 6, transition: 'background 0.15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.35)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0)'}
+                          >
                             <Eye size={14} /> Enlarge
                           </div>
                         </div>
                       ) : (
-                        <div className="sd-doc-placeholder h-[120px] flex items-center justify-center bg-[#f3f4f6]">
-                          <doc.Icon size={38} color="#d1d5db" />
+                        <div style={{ height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tokens.surfaceHigh }}>
+                          <doc.Icon size={38} color={tokens.border} />
                         </div>
                       )}
-                      <div className="sd-doc-foot p-[14px] text-center">
-                        <div className="sd-doc-name text-[13px] font-bold text-[#374151] mb-[3px]">{doc.title}</div>
-                        {doc.fileName && <div className="sd-doc-file text-[10px] text-[#94a3b8] mb-[10px] break-all">{doc.fileName}</div>}
+                      <div style={{ padding: 14, textAlign: 'center' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: tokens.textSecondary, marginBottom: 3 }}>{doc.title}</div>
+                        {doc.fileName && <div style={{ fontSize: 10, color: tokens.textMuted, marginBottom: 10, wordBreak: 'break-all' }}>{doc.fileName}</div>}
                         {hasDoc ? (
-                          <button className="sd-doc-btn bg-[#f3f4f6] text-[#374151] border-none rounded-[7px] py-[6px] px-[14px] text-[12px] font-semibold cursor-pointer flex items-center gap-[5px] mx-auto transition-all hover:bg-[#e2e8f0]" onClick={() => isPdf ? window.open(doc.url, '_blank') : setPreviewDoc({ url: doc.url, title: doc.title })}>
+                          <button onClick={() => isPdf ? window.open(doc.url, '_blank') : setPreviewDoc({ url: doc.url, title: doc.title })} style={{ background: tokens.surfaceHigh, color: tokens.textSecondary, border: `1px solid ${tokens.border}`, borderRadius: tokens.radius.md, padding: '6px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: 'inherit' }}>
                             {isPdf ? <><FileText size={12} /> View PDF</> : <><Eye size={12} /> Full Size</>}
                           </button>
                         ) : (
-                          <span className="sd-doc-empty text-[12px] text-[#d1d5db] italic">Not uploaded</span>
+                          <span style={{ fontSize: 12, color: tokens.textMuted, fontStyle: 'italic' }}>Not uploaded</span>
                         )}
                       </div>
                     </div>
@@ -272,48 +251,52 @@ export default function StaffDetail() {
       </div>
 
       {previewDoc && (
-        <div className="sd-modal-overlay fixed inset-0 bg-[#0f172a]/70 flex items-center justify-center z-[200] p-[20px] backdrop-blur-[2px]" onClick={() => setPreviewDoc(null)}>
-          <div className="sd-modal bg-white rounded-[20px] overflow-hidden max-w-[90vw] max-h-[90vh] flex flex-col shadow-[0_30px_80px_rgba(0,0,0,0.22)]" onClick={e => e.stopPropagation()}>
-            <div className="sd-modal-head flex justify-between items-center p-[14px_18px] border-b border-[#e5e7eb] shrink-0">
-              <span className="sd-modal-title text-[14px] font-bold text-[#0f172a]">{previewDoc.title}</span>
-              <button className="sd-close-btn w-[32px] h-[32px] rounded-[8px] bg-[#f3f4f6] border-none cursor-pointer flex items-center justify-center text-[#374151] transition-all hover:bg-[#fee2e2] hover:text-[#dc2626]" onClick={() => setPreviewDoc(null)}><X size={14} /></button>
+        <div style={{ position: 'fixed', inset: 0, background: tokens.modalOverlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20, backdropFilter: 'blur(2px)' }} onClick={() => setPreviewDoc(null)}>
+          <div style={{ background: tokens.surface, borderRadius: tokens.radius.xxl, overflow: 'hidden', maxWidth: '90vw', maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: tokens.shadowModal }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: `1px solid ${tokens.border}`, flexShrink: 0 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: tokens.text }}>{previewDoc.title}</span>
+              <button onClick={() => setPreviewDoc(null)} style={{ width: 30, height: 30, borderRadius: tokens.radius.md, background: tokens.surfaceHigh, border: `1px solid ${tokens.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: tokens.textSecondary }}>
+                <X size={14} />
+              </button>
             </div>
-            <div className="overflow-auto p-[4px]">
-              <img src={previewDoc.url} alt={previewDoc.title} className="max-w-full max-h-[80vh] object-contain block" />
+            <div style={{ overflow: 'auto', padding: 4 }}>
+              <img src={previewDoc.url} alt={previewDoc.title} style={{ maxWidth: '100%', maxHeight: '80vh', objectFit: 'contain', display: 'block' }} />
             </div>
           </div>
         </div>
       )}
 
       {rejectModal && (
-        <div className="sd-modal-overlay fixed inset-0 bg-[#0f172a]/70 flex items-center justify-center z-[200] p-[20px] backdrop-blur-[2px]" onClick={() => setRejectModal(false)}>
-          <div className="sd-reject-modal bg-white rounded-[20px] p-[32px] w-full max-w-[460px] shadow-[0_24px_80px_rgba(0,0,0,0.2)]" onClick={e => e.stopPropagation()}>
-            <div className="sd-reject-title text-[20px] font-extrabold text-[#0f172a] mb-[6px]">Reject Staff Profile</div>
-            <p className="sd-reject-sub text-[13px] text-[#6b7280] mb-[18px] leading-[1.6]">This message will be shown to the staff member in the app and sent via email.</p>
+        <div style={{ position: 'fixed', inset: 0, background: tokens.modalOverlay, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20, backdropFilter: 'blur(2px)' }} onClick={() => setRejectModal(false)}>
+          <div style={{ background: tokens.surface, borderRadius: tokens.radius.xxl, padding: 32, width: '100%', maxWidth: 460, boxShadow: tokens.shadowModal, border: `1px solid ${tokens.border}` }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: tokens.text, marginBottom: 6 }}>Reject Staff Profile</div>
+            <p style={{ fontSize: 13, color: tokens.textMuted, marginBottom: 18, lineHeight: 1.6 }}>This message will be shown to the staff member in the app and sent via email.</p>
             <textarea
-              className="sd-textarea w-full rounded-[10px] border-[1.5px] border-[#e2e8f0] p-[12px_14px] text-[13px] text-[#0f172a] font-['DM_Sans'] resize-y outline-none bg-[#f9fafb] min-h-[100px] mb-[10px] transition-all focus:border-[#16a34a] focus:bg-white"
+              style={{ width: '100%', borderRadius: tokens.radius.lg, border: `1.5px solid ${tokens.inputBorder}`, padding: '12px 14px', fontSize: 13, color: tokens.text, fontFamily: 'inherit', resize: 'vertical', outline: 'none', background: tokens.inputBg, minHeight: 100, marginBottom: 10 }}
               placeholder="e.g. Your ID card is not clearly visible. Please re-upload a clearer photo."
-              value={rejectionText}
-              onChange={e => setRejectionText(e.target.value)}
-              rows={4}
+              value={rejectionText} onChange={e => setRejectionText(e.target.value)} rows={4}
+              onFocus={e => e.target.style.borderColor = tokens.inputFocus}
+              onBlur={e => e.target.style.borderColor = tokens.inputBorder}
             />
             {rejectionError && (
-              <div className="sd-reject-error bg-[#fef2f2] text-[#dc2626] border border-[#fecaca] rounded-[8px] p-[8px_12px] text-[12px] mb-[12px] flex items-center gap-[7px]">
-                <AlertCircle size={13} className="shrink-0" /> {rejectionError}
+              <div style={{ background: tokens.dangerBg, color: tokens.danger, border: `1px solid ${tokens.dangerBorder}`, borderRadius: tokens.radius.md, padding: '8px 12px', fontSize: 12, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 7 }}>
+                <AlertCircle size={13} style={{ flexShrink: 0 }} /> {rejectionError}
               </div>
             )}
-            <div className="sd-btn-row flex gap-[10px]">
-              <button className="sd-btn cancel flex-1 rounded-[10px] p-[12px] text-[14px] font-bold cursor-pointer transition-all flex items-center justify-center gap-[7px] bg-[#f8fafc] text-[#374151] border-[1.5px] border-[#e2e8f0] hover:border-[#94a3b8]" onClick={() => { setRejectModal(false); setRejectionText(''); setRejectionError('') }}>
-                Cancel
-              </button>
-              <button className="sd-btn danger flex-1 rounded-[10px] p-[12px] text-[14px] font-bold cursor-pointer transition-all flex items-center justify-center gap-[7px] border-none bg-[#dc2626] text-white hover:not-disabled:bg-[#b91c1c] disabled:opacity-[0.65] disabled:cursor-not-allowed" onClick={handleReject} disabled={actionLoading}>
-                {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <XCircle size={14} />}
-                Reject & Notify
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { setRejectModal(false); setRejectionText(''); setRejectionError('') }} style={{ flex: 1, borderRadius: tokens.radius.lg, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', background: tokens.surfaceHigh, color: tokens.textSecondary, border: `1.5px solid ${tokens.border}`, fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={handleReject} disabled={actionLoading} style={{ flex: 1, borderRadius: tokens.radius.lg, padding: 12, fontSize: 14, fontWeight: 700, cursor: 'pointer', background: tokens.danger, color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, fontFamily: 'inherit', opacity: actionLoading ? 0.65 : 1 }}>
+                {actionLoading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <XCircle size={14} />} Reject & Notify
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @media (max-width: 768px) { .staff-grid { grid-template-columns: 1fr !important; } }
+      `}</style>
     </div>
   )
 }

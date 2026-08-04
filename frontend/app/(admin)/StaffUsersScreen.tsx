@@ -2,12 +2,12 @@ import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import { useEffect, useState } from "react"
 import { ActivityIndicator, FlatList, Image, Modal, RefreshControl, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from "react-native"
-import { auth } from "../../firebase/firebaseConfig"
+import AsyncStorage from "@react-native-async-storage/async-storage"
 
 async function getToken() {
-  const user = auth.currentUser
-  if (!user) throw new Error("Not authenticated")
-  return user.getIdToken()
+  const token = await AsyncStorage.getItem("unifix_access_token")
+  if (!token) throw new Error("Not authenticated")
+  return token
 }
 
 const ROLE_COLOR: Record<string, string> = { student: "#3b82f6", teacher: "#8b5cf6", staff: "#f59e0b" }

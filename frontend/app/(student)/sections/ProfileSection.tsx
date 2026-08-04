@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { doc, updateDoc } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { memo, useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -18,7 +18,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { auth, db } from "../../../firebase/firebaseConfig";
+
 import { authAPI } from "../../../services/api";
 
 const CLOUDINARY_CLOUD = "dcizaxjul";
@@ -169,11 +169,13 @@ export default memo(function ProfileSection({
         result.assets[0].uri,
         "unifix/profiles",
       );
-      const u = auth.currentUser;
-      if (u) {
-        await updateDoc(doc(db, "users", u.uid), { photoUrl: url });
-        if (onIdCardUpdate) onIdCardUpdate();
-      }
+  const token = await AsyncStorage.getItem("unifix_access_token");
+      await fetch(`${process.env.EXPO_PUBLIC_BASE_URL}/auth/complete-profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ photoUrl: url }),
+      });
+      if (onIdCardUpdate) onIdCardUpdate();
     } catch {
     } finally {
       setPhotoUploading(false);
@@ -193,15 +195,8 @@ export default memo(function ProfileSection({
     }
     setProfileSaving(true);
     try {
-      await authAPI.updateProfile(editName.trim(), editPhone.trim());
-      const u = auth.currentUser;
-      if (u) {
-        await updateDoc(doc(db, "users", u.uid), {
-          fullName: editName.trim(),
-          phone: editPhone.trim(),
-        });
-        if (onIdCardUpdate) onIdCardUpdate();
-      }
+await authAPI.updateProfile(editName.trim(), editPhone.trim());
+      if (onIdCardUpdate) onIdCardUpdate();
       setProfileSuccess("Profile updated successfully.");
     } catch (err: any) {
       setProfileError(err.message || "Failed to update profile.");

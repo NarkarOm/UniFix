@@ -1,12 +1,39 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { auth } from "../firebase/firebaseConfig";
 
 const BASE_URL = process.env.EXPO_PUBLIC_BASE_URL;
 
-const getToken = async (forceRefresh = false): Promise<string> => {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated");
-  return await user.getIdToken(forceRefresh);
+const getToken = async (): Promise<string> => {
+  const token = await AsyncStorage.getItem("unifix_access_token");
+  if (!token) throw new Error("Not authenticated");
+  return token;
+};
+
+const refreshAccessToken = async (): Promise<string> => {
+  const refreshToken = await AsyncStorage.getItem("unifix_refresh_token");
+  if (!refreshToken) throw new Error("SESSION_EXPIRED");
+
+  const res = await fetch(`${BASE_URL}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!res.ok) {
+    await AsyncStorage.multiRemove([
+      "unifix_access_token",
+      "unifix_refresh_token",
+      "unifix_cached_user",
+      "unifix_active_tab",
+      "unifix_staff_active_tab",
+      "unifix_admin_active_tab",
+    ]);
+    throw new Error("SESSION_EXPIRED");
+  }
+
+  const data = await res.json();
+  await AsyncStorage.setItem("unifix_access_token", data.data.token);
+  await AsyncStorage.setItem("unifix_refresh_token", data.data.refreshToken);
+  return data.data.token;
 };
 
 const request = async (
@@ -30,10 +57,9 @@ const request = async (
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  // Token expired — force refresh and retry once
   if (res.status === 401 && requiresAuth) {
     try {
-      const freshToken = await getToken(true);
+      const freshToken = await refreshAccessToken();
       headers["Authorization"] = `Bearer ${freshToken}`;
       const retry = await fetch(`${BASE_URL}${endpoint}`, {
         method,
@@ -41,10 +67,10 @@ const request = async (
         body: body ? JSON.stringify(body) : undefined,
       });
 
-      // Still 401 after refresh — session is dead, force logout
       if (retry.status === 401) {
-        await auth.signOut();
         await AsyncStorage.multiRemove([
+          "unifix_access_token",
+          "unifix_refresh_token",
           "unifix_cached_user",
           "unifix_active_tab",
           "unifix_staff_active_tab",
@@ -53,37 +79,24 @@ const request = async (
         throw new Error("SESSION_EXPIRED");
       }
 
-      let retryData: any;
       const retryType = retry.headers.get("content-type");
-      if (retryType && retryType.includes("application/json")) {
-        retryData = await retry.json();
-      } else {
-        retryData = { message: await retry.text() };
-      }
+      const retryData = retryType?.includes("application/json")
+        ? await retry.json()
+        : { message: await retry.text() };
 
-      if (!retry.ok) {
-        throw new Error(retryData?.error || retryData?.message || "Request failed");
-      }
-
+      if (!retry.ok) throw new Error(retryData?.error || retryData?.message || "Request failed");
       return retryData;
     } catch (err: any) {
       throw err;
     }
   }
 
-  let data: any;
   const contentType = res.headers.get("content-type");
-  if (contentType && contentType.includes("application/json")) {
-    data = await res.json();
-  } else {
-    const text = await res.text();
-    data = { message: text };
-  }
+  const data = contentType?.includes("application/json")
+    ? await res.json()
+    : { message: await res.text() };
 
-  if (!res.ok) {
-    throw new Error(data?.error || data?.message || "Request failed");
-  }
-
+  if (!res.ok) throw new Error(data?.error || data?.message || "Request failed");
   return data;
 };
 
@@ -113,6 +126,9 @@ export const authAPI = {
   verifyResetOtp: (email: string, otp: string, newPassword: string) =>
     post("/auth/verify-reset-otp", { email, otp, newPassword }, false),
 
+  refreshToken: (refreshToken: string) =>
+    post("/auth/refresh", { refreshToken }, false),
+
   changePassword: (currentPassword: string, newPassword: string) =>
     post("/auth/change-password", { currentPassword, newPassword }),
 
@@ -131,7 +147,7 @@ export const authAPI = {
 
   myProfile: () => get("/auth/my-profile"),
 
- savePushToken: (expoPushToken: string) =>
+  savePushToken: (expoPushToken: string) =>
     post("/auth/save-push-token", { expoPushToken }),
 
   reportRagging: (payload: {
@@ -167,18 +183,18 @@ export const complaintsAPI = {
   rate: (complaintId: string, rating: number, comment?: string) =>
     post("/complaints/rate", { complaintId, rating, comment }),
 
-myComplaints: () => get("/complaints/my-complaints"),
+  myComplaints: () => get("/complaints/my-complaints"),
   myComplaintsSince: (since: number | null) =>
-    get(`/complaints/my-complaints${since ? `?since=${since}` : ''}`),
+    get(`/complaints/my-complaints${since ? `?since=${since}` : ""}`),
   getHash: () => get("/complaints/my-complaints/hash"),
   allComplaintsSince: (since: number | null) =>
-    get(`/admin/all-complaints${since ? `?since=${since}` : ''}`),
+    get(`/admin/all-complaints${since ? `?since=${since}` : ""}`),
   getAdminHash: () => get("/admin/all-complaints/hash"),
 
- staffComplaints: () => get("/complaints/staff-complaints"),
+  staffComplaints: () => get("/complaints/staff-complaints"),
   staffComplaintsSince: (since: number | null) =>
-    get(`/complaints/staff-complaints${since ? `?since=${since}` : ''}`),
-getStaffHash: () => get("/complaints/staff-complaints/hash"),
+    get(`/complaints/staff-complaints${since ? `?since=${since}` : ""}`),
+  getStaffHash: () => get("/complaints/staff-complaints/hash"),
   getById: (id: string) => get(`/complaints/${id}`),
 };
 
@@ -208,12 +224,13 @@ export const lostFoundAPI = {
     photoUrl: string | null;
   }) => post("/lost-found/post", payload),
 
- handover: (itemId: string, handedToName: string) =>
+  handover: (itemId: string, handedToName: string) =>
     post("/lost-found/handover", { itemId, handedToName }),
 
   deletePost: (itemId: string) =>
     request("DELETE", `/lost-found/${itemId}`, undefined),
 };
+
 export const lostReportsAPI = {
   feed: (cursor?: string) =>
     get(`/lost-reports/feed?limit=10${cursor ? `&after=${cursor}` : ""}`),
@@ -230,7 +247,6 @@ export const lostReportsAPI = {
     howToReach: string;
     images: string[];
   }) => request("POST", "/lost-reports/post", payload),
-
 
   markFound: (id: string) => request("PATCH", `/lost-reports/${id}/found`, {}),
 

@@ -1,62 +1,122 @@
 import { Wrench, ClipboardList, ArrowRight } from 'lucide-react'
-import { StatusBadge, EmptyState, SectionHeader } from '../components/SharedComponents.jsx'
+import { useTheme } from '../theme/ThemeProvider'
+import { StatusBadge, EmptyState, SectionHeader, TabBar } from '../components/SharedComponents'
 
 export default function MaintenanceSection({ items, activeTab, onTabChange, stats, loading, navigate }) {
+  const { tokens } = useTheme()
+
   const tabs = [
     { key: 'pending', label: 'Pending', count: stats.pending },
     { key: 'approved', label: 'Approved', count: stats.approved },
     { key: 'rejected', label: 'Rejected', count: stats.rejected },
   ]
+
   const miniStats = [
-    { label: 'Total Staff', value: stats.total ?? 0, color: '#0f172a' },
-    { label: 'Pending Review', value: stats.pending ?? 0, color: '#d97706' },
-    { label: 'Approved', value: stats.approved ?? 0, color: '#059669' },
-    { label: 'Rejected', value: stats.rejected ?? 0, color: '#dc2626' },
+    { label: 'Total Staff', value: stats.total ?? 0, color: tokens.text },
+    { label: 'Pending Review', value: stats.pending ?? 0, color: tokens.warning },
+    { label: 'Approved', value: stats.approved ?? 0, color: tokens.success },
+    { label: 'Rejected', value: stats.rejected ?? 0, color: tokens.danger },
   ]
+
   return (
     <div>
       <SectionHeader title="Maintenance Staff" subtitle="Review and manage maintenance staff verification requests" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-[14px] mb-[24px]">
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 14, marginBottom: 24 }}>
         {miniStats.map(s => (
-          <div key={s.label} className="bg-white rounded-[12px] p-[16px_20px] border border-[#f0f0f0] flex items-center gap-[14px]">
-            <div className="w-[40px] h-[40px] rounded-[10px] bg-[#f8fafc] flex items-center justify-center shrink-0"><Wrench size={18} color={s.color} /></div>
+          <div key={s.label} style={{
+            background: tokens.surface, borderRadius: tokens.radius.xl,
+            padding: '16px 20px', border: `1px solid ${tokens.border}`,
+            display: 'flex', alignItems: 'center', gap: 14,
+            boxShadow: tokens.shadow,
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: tokens.radius.lg,
+              background: tokens.surfaceLow, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <Wrench size={18} color={s.color} />
+            </div>
             <div>
-              <div className="text-[24px] font-extrabold leading-none" style={{ color: s.color }}>{loading ? '—' : s.value}</div>
-              <div className="text-[12px] text-[#94a3b8] font-medium mt-[3px]">{s.label}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: s.color, lineHeight: 1 }}>
+                {loading ? '—' : s.value}
+              </div>
+              <div style={{ fontSize: 12, color: tokens.textMuted, fontWeight: 500, marginTop: 3 }}>{s.label}</div>
             </div>
           </div>
         ))}
       </div>
-      <div className="flex gap-[6px] mb-[20px] flex-wrap">
-        {tabs.map(tab => (
-          <button key={tab.key} className={`flex items-center gap-[6px] p-[7px_13px] rounded-[8px] text-[12px] font-semibold cursor-pointer transition-all duration-150 border-[1.5px] ${activeTab === tab.key ? 'bg-[#0f172a] text-white border-[#0f172a]' : 'bg-white text-[#64748b] border-[#e2e8f0] hover:border-[#16a34a] hover:text-[#16a34a]'}`} onClick={() => onTabChange(tab.key)}>
-            {tab.label}<span className={`text-[10px] font-extrabold px-[6px] py-[1px] rounded-[20px] shrink-0 ${activeTab === tab.key ? 'bg-white/20 text-white' : 'bg-[#f1f5f9] text-[#64748b]'}`}>{tab.count ?? 0}</span>
-          </button>
-        ))}
+
+      <div style={{ marginBottom: 20 }}>
+        <TabBar tabs={tabs} active={activeTab} onChange={onTabChange} />
       </div>
-      {loading ? <div className="p-[60px] text-center text-[#94a3b8] text-[14px]">Loading…</div>
-        : items.length === 0 ? <EmptyState icon={ClipboardList} text={`No ${activeTab} applications`} sub="Check back later" />
-          : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
-              {items.map(member => (
-                <div key={member.id} className="bg-white rounded-[14px] border border-[#f0f0f0] overflow-hidden">
-                  <div className="p-[16px_18px] border-b border-[#f9f9f9] flex items-center gap-[12px]">
-                    <div className="w-[42px] h-[42px] rounded-[11px] flex items-center justify-center text-[16px] font-extrabold shrink-0 border-[1.5px] bg-[#f0fdf4] text-[#16a34a] border-[#bbf7d0]">{member.fullName?.[0]?.toUpperCase() ?? '?'}</div>
-                    <div className="flex-1 min-w-0"><div className="text-[14px] font-bold text-[#0f172a] mb-[2px]">{member.fullName}</div><div className="text-[11px] text-[#94a3b8] overflow-hidden text-ellipsis whitespace-nowrap">{member.email}</div></div>
-                    <StatusBadge verification={member.verificationStatus} />
-                  </div>
-                  <div className="p-[13px_18px]">
-                    {[['Employee ID', member.employeeId], ['Designation', member.designation], ['Experience', member.experience ? `${member.experience} yrs` : null], ['Phone', member.phone]].map(([k, v]) => v ? (
-                      <div key={k} className="flex justify-between items-center py-[6px] border-b border-[#f9f9f9] last:border-none"><span className="text-[12px] text-[#94a3b8] font-medium">{k}</span><span className="text-[12px] text-[#374151] font-semibold text-right">{v}</span></div>
-                    ) : null)}
-                  </div>
-                  <div className="p-[12px_18px]">
-                    <button className="w-full bg-[#0f172a] text-white border-none rounded-[9px] p-[10px] text-[13px] font-bold cursor-pointer flex items-center justify-center gap-[6px] transition-all duration-150 hover:bg-[#1e293b]" onClick={() => navigate(`/staff/${member.id}`)}>View Full Profile <ArrowRight size={14} /></button>
-                  </div>
+
+      {loading ? (
+        <div style={{ padding: 60, textAlign: 'center', color: tokens.textMuted, fontSize: 14 }}>Loading…</div>
+      ) : items.length === 0 ? (
+        <EmptyState icon={ClipboardList} text={`No ${activeTab} applications`} sub="Check back later" />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {items.map(member => (
+            <div key={member.id} style={{
+              background: tokens.surface, borderRadius: tokens.radius.xl,
+              border: `1px solid ${tokens.border}`, overflow: 'hidden',
+              boxShadow: tokens.shadow,
+            }}>
+              <div style={{
+                padding: '14px 16px', borderBottom: `1px solid ${tokens.border}`,
+                display: 'flex', alignItems: 'center', gap: 12,
+              }}>
+                <div style={{
+                  width: 42, height: 42, borderRadius: tokens.radius.lg,
+                  background: tokens.successBg, border: `1.5px solid ${tokens.successBorder}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 16, fontWeight: 800, color: tokens.success, flexShrink: 0,
+                }}>
+                  {member.fullName?.[0]?.toUpperCase() ?? '?'}
                 </div>
-              ))}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: tokens.text, marginBottom: 2 }}>{member.fullName}</div>
+                  <div style={{ fontSize: 11, color: tokens.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{member.email}</div>
+                </div>
+                <StatusBadge verification={member.verificationStatus} />
+              </div>
+
+              <div style={{ padding: '12px 16px' }}>
+                {[
+                  ['Employee ID', member.employeeId],
+                  ['Designation', member.designation],
+                  ['Experience', member.experience ? `${member.experience} yrs` : null],
+                  ['Phone', member.phone],
+                ].filter(([, v]) => v).map(([k, v]) => (
+                  <div key={k} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '6px 0', borderBottom: `1px solid ${tokens.border}`,
+                  }}>
+                    <span style={{ fontSize: 12, color: tokens.textMuted, fontWeight: 500 }}>{k}</span>
+                    <span style={{ fontSize: 12, color: tokens.textSecondary, fontWeight: 600, textAlign: 'right' }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ padding: '12px 16px' }}>
+                <button
+                  onClick={() => navigate(`/staff/${member.id}`)}
+                  style={{
+                    width: '100%', background: tokens.text, color: tokens.surface,
+                    border: 'none', borderRadius: tokens.radius.lg, padding: '10px',
+                    fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    fontFamily: 'inherit', transition: 'opacity 0.15s',
+                  }}
+                >
+                  View Full Profile <ArrowRight size={14} />
+                </button>
+              </div>
             </div>
-          )}
+          ))}
+        </div>
+      )}
     </div>
   )
 }

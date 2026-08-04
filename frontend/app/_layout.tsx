@@ -1,12 +1,10 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter } from "expo-router";
-import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
 import {
   Alert,
@@ -15,13 +13,17 @@ import {
   InteractionManager,
   Platform,
   StyleSheet,
-  View
+  View,
 } from "react-native";
-import { getDb } from '../db/database';
+import { getDb } from "../db/database";
 
 import Toast from "react-native-toast-message";
-import { AdminDashboardSkeleton, DashboardSkeleton, StaffDashboardSkeleton } from "../components/skeleton";
-import { auth, db } from "../firebase/firebaseConfig";
+import {
+  AdminDashboardSkeleton,
+  DashboardSkeleton,
+  StaffDashboardSkeleton,
+} from "../components/skeleton";
+import { authAPI } from "../services/api";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -43,7 +45,12 @@ if (Platform.OS === "android") {
   });
 }
 
-const EXIT_ROUTES = ["/", "/(student)/index", "/(staff)/staff-dashboard", "/(admin)/admin-dashboard"];
+const EXIT_ROUTES = [
+  "/",
+  "/(student)/index",
+  "/(staff)/staff-dashboard",
+  "/(admin)/admin-dashboard",
+];
 
 async function registerForPushNotifications(): Promise<string | null> {
   try {
@@ -89,20 +96,7 @@ async function registerForPushNotifications(): Promise<string | null> {
 
 async function savePushTokenToServer(token: string) {
   try {
-    const user = auth.currentUser;
-    if (!user) return;
-    const idToken = await user.getIdToken();
-    const BASE_URL = process.env.EXPO_PUBLIC_BASE_URL;
-    const res = await fetch(`${BASE_URL}/auth/save-push-token`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({ expoPushToken: token }),
-    });
-    const data = await res.json();
-    console.log("[Push] Save token response:", data);
+    await authAPI.savePushToken(token);
   } catch (e) {
     console.error("[Push] Save token error:", e);
   }
@@ -119,7 +113,7 @@ function UnifixSplash() {
     }).start();
   }, []);
 
-return (
+  return (
     <View style={splashStyles.container}>
       <Animated.Image
         source={require("../assets/1.png")}
@@ -127,21 +121,26 @@ return (
         resizeMode="contain"
       />
       <View style={splashStyles.footer}>
-        <Animated.Text style={[splashStyles.from, { opacity }]}>from</Animated.Text>
-        <Animated.Text style={[splashStyles.name, { opacity }]}>VCET</Animated.Text>
+        <Animated.Text style={[splashStyles.from, { opacity }]}>
+          from
+        </Animated.Text>
+        <Animated.Text style={[splashStyles.name, { opacity }]}>
+          VCET
+        </Animated.Text>
       </View>
     </View>
   );
 }
+
 const splashStyles = StyleSheet.create({
   container: {
     flex: 1,
-  backgroundColor: "white",
+    backgroundColor: "white",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 40,
   },
-logo: {
+  logo: {
     width: 180,
     height: 180,
   },
@@ -167,19 +166,19 @@ logo: {
 
 export default function RootLayout() {
   const router = useRouter();
-const [appReady, setAppReady] = useState(false);
+  const [appReady, setAppReady] = useState(false);
   const [initialRoute, setInitialRoute] = useState<string | null>(null);
   const [minSplashDone, setMinSplashDone] = useState(false);
- const hasNavigatedRef = useRef(false);
+  const hasNavigatedRef = useRef(false);
   const showRoleOverlayRef = useRef<((role: string) => void) | null>(null);
   const [cachedRole, setCachedRole] = useState<string | null>(null);
   const currentRouteRef = useRef<string | null>(null);
   const notificationListener = useRef<Notifications.EventSubscription | null>(
-    null,
+    null
   );
   const responseListener = useRef<Notifications.EventSubscription | null>(null);
 
-useEffect(() => {
+  useEffect(() => {
     if (initialRoute) currentRouteRef.current = initialRoute;
   }, [initialRoute]);
 
@@ -200,7 +199,7 @@ useEffect(() => {
               onPress: () => BackHandler.exitApp(),
             },
           ],
-          { cancelable: true },
+          { cancelable: true }
         );
         return true;
       }
@@ -212,149 +211,144 @@ useEffect(() => {
   }, []);
 
   useEffect(() => {
-    let authUnsubscribe: (() => void) | null = null;
-
     const initAuth = async () => {
       try {
         const cachedUserStr = await AsyncStorage.getItem("unifix_cached_user");
         const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
 
-  if (
-          cachedUser &&
-          cachedUser.uid &&
-          cachedUser.role &&
-          cachedUser.route
-        ) {
+        if (cachedUser && cachedUser.uid && cachedUser.role && cachedUser.route) {
           currentRouteRef.current = cachedUser.route;
           setInitialRoute(cachedUser.route);
           setCachedRole(cachedUser.role);
           setAppReady(true);
         }
 
-       authUnsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-          // ── BACKGROUND VERIFICATION ONLY ──
-          // If we already routed from cache, don't block UI — just verify silently
-          const alreadyRouted = !!currentRouteRef.current;
+        const accessToken = await AsyncStorage.getItem("unifix_access_token");
 
-          try {
-    if (!firebaseUser) {
-              const netState = await NetInfo.fetch();
-              const online = !!(netState.isConnected && netState.isInternetReachable);
-
-              if (!online && alreadyRouted) {
-                // Offline but we already routed using a valid cached session —
-                // Firebase just hasn't restored its session yet. Don't wipe
-                // cache, don't log out. It'll re-verify once back online.
-                return;
-              }
-
-              await AsyncStorage.removeItem("unifix_cached_user");
-              if (!alreadyRouted) {
-                currentRouteRef.current = "/login";
-                setInitialRoute("/login");
-                setAppReady(true);
-              } else {
-                router.replace("/login" as any);
-              }
-              return;
-            }
-
-            // Don't force-refresh token on every open — only when cache is old
-            const cachedStr = await AsyncStorage.getItem("unifix_cached_user");
-            const cached = cachedStr ? JSON.parse(cachedStr) : null;
-            const cacheAgeMs = cached?.cachedAt ? Date.now() - cached.cachedAt : Infinity;
-            const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
-
-    // Skip Firestore fetch if cache is fresh
-            if (alreadyRouted && cacheAgeMs < CACHE_TTL) {
-              // Cache is fresh — just register push token silently, don't touch UI
-              const pushToken = await registerForPushNotifications();
-              if (pushToken) savePushTokenToServer(pushToken); // fire and forget
-              return;
-            }
-
-            // Cache is stale or first open — do full verification in background
-            let idToken;
-            try {
-              idToken = await firebaseUser.getIdToken(); // no force-refresh
-            } catch (tokenError) {
-              console.log("Token refresh failed, using cached session");
-              if (!alreadyRouted) {
-                currentRouteRef.current = "/login";
-                setInitialRoute("/login");
-                setAppReady(true);
-              }
-              return;
-            }
-
-            const snap = await getDoc(doc(db, "users", firebaseUser.uid));
-
-            if (!snap.exists() || !snap.data()?.profileCompleted) {
-              await AsyncStorage.removeItem("unifix_cached_user");
-              const target = "/complete-profile";
-              if (!alreadyRouted) {
-                currentRouteRef.current = target;
-                setInitialRoute(target);
-                setAppReady(true);
-              } else {
-                router.replace(target as any);
-              }
-              return;
-            }
-
-            const { role, verificationStatus } = snap.data();
-
-            if (role === "staff" && verificationStatus !== "approved") {
-              await AsyncStorage.removeItem("unifix_cached_user");
-              const target = "/complete-profile";
-              if (!alreadyRouted) {
-                currentRouteRef.current = target;
-                setInitialRoute(target);
-                setAppReady(true);
-              } else {
-                router.replace(target as any);
-              }
-              return;
-            }
-
-            const route =
-              role === "admin"
-                ? "/admin-dashboard"
-                : role === "staff" && verificationStatus === "approved"
-                  ? "/staff-dashboard"
-                  : "/";
-
-            // Update cache with fresh timestamp
-            await AsyncStorage.setItem(
-              "unifix_cached_user",
-              JSON.stringify({
-                uid: firebaseUser.uid,
-                role,
-                route,
-                cachedAt: Date.now(),
-              }),
-            );
-
-            if (!alreadyRouted) {
-              currentRouteRef.current = route;
-              setInitialRoute(route);
-              setAppReady(true);
-            } else if (route !== currentRouteRef.current) {
-              // Role changed (e.g. staff got approved) — redirect silently
-              router.replace(route as any);
-            }
-
-      const pushToken = await registerForPushNotifications();
-            if (pushToken) savePushTokenToServer(pushToken); // fire and forget
-          } catch (err) {
-            console.log("Firebase auth error:", err);
-            if (!alreadyRouted) {
-              currentRouteRef.current = "/login";
-              setInitialRoute("/login");
-              setAppReady(true);
-            }
+        if (!accessToken) {
+          await AsyncStorage.removeItem("unifix_cached_user");
+          if (!currentRouteRef.current) {
+            currentRouteRef.current = "/login";
+            setInitialRoute("/login");
+            setAppReady(true);
+          } else {
+            router.replace("/login" as any);
           }
-        });
+          return;
+        }
+
+        const alreadyRouted = !!currentRouteRef.current;
+        const cacheAgeMs = cachedUser?.cachedAt
+          ? Date.now() - cachedUser.cachedAt
+          : Infinity;
+        const CACHE_TTL = 30 * 60 * 1000;
+
+        if (alreadyRouted && cacheAgeMs < CACHE_TTL) {
+          const pushToken = await registerForPushNotifications();
+          if (pushToken) savePushTokenToServer(pushToken);
+          return;
+        }
+
+        let profile: any = null;
+        try {
+          const res = await authAPI.myProfile();
+          profile = res?.data?.profile ?? res?.profile ?? null;
+        } catch (err: any) {
+          const netState = await NetInfo.fetch();
+          const online = !!(
+            netState.isConnected && netState.isInternetReachable
+          );
+
+          if (!online && alreadyRouted) {
+            return;
+          }
+
+          await AsyncStorage.multiRemove([
+            "unifix_access_token",
+            "unifix_refresh_token",
+            "unifix_cached_user",
+          ]);
+          if (!alreadyRouted) {
+            currentRouteRef.current = "/login";
+            setInitialRoute("/login");
+            setAppReady(true);
+          } else {
+            router.replace("/login" as any);
+          }
+          return;
+        }
+
+        if (!profile) {
+          await AsyncStorage.multiRemove([
+            "unifix_access_token",
+            "unifix_refresh_token",
+            "unifix_cached_user",
+          ]);
+          if (!alreadyRouted) {
+            currentRouteRef.current = "/login";
+            setInitialRoute("/login");
+            setAppReady(true);
+          } else {
+            router.replace("/login" as any);
+          }
+          return;
+        }
+
+        if (!profile.profileCompleted) {
+          await AsyncStorage.removeItem("unifix_cached_user");
+          const target = "/complete-profile";
+          if (!alreadyRouted) {
+            currentRouteRef.current = target;
+            setInitialRoute(target);
+            setAppReady(true);
+          } else {
+            router.replace(target as any);
+          }
+          return;
+        }
+
+        const { role, verificationStatus } = profile;
+
+        if (role === "staff" && verificationStatus !== "approved") {
+          await AsyncStorage.removeItem("unifix_cached_user");
+          const target = "/complete-profile";
+          if (!alreadyRouted) {
+            currentRouteRef.current = target;
+            setInitialRoute(target);
+            setAppReady(true);
+          } else {
+            router.replace(target as any);
+          }
+          return;
+        }
+
+        const route =
+          role === "admin"
+            ? "/admin-dashboard"
+            : role === "staff" && verificationStatus === "approved"
+            ? "/staff-dashboard"
+            : "/";
+
+        await AsyncStorage.setItem(
+          "unifix_cached_user",
+          JSON.stringify({
+            uid: profile.id,
+            role,
+            route,
+            cachedAt: Date.now(),
+          })
+        );
+
+        if (!alreadyRouted) {
+          currentRouteRef.current = route;
+          setInitialRoute(route);
+          setAppReady(true);
+        } else if (route !== currentRouteRef.current) {
+          router.replace(route as any);
+        }
+
+        const pushToken = await registerForPushNotifications();
+        if (pushToken) savePushTokenToServer(pushToken);
       } catch (err) {
         currentRouteRef.current = "/login";
         setInitialRoute("/login");
@@ -362,120 +356,120 @@ useEffect(() => {
       }
     };
 
-   getDb().catch(() => {});
+    getDb().catch(() => {});
     initAuth();
 
     notificationListener.current =
       Notifications.addNotificationReceivedListener(() => {});
 
     responseListener.current =
-      Notifications.addNotificationResponseReceivedListener(
-        async (response) => {
-          const data = response.notification.request.content.data as any;
-          if (!data) return;
+      Notifications.addNotificationResponseReceivedListener(async (response) => {
+        const data = response.notification.request.content.data as any;
+        if (!data) return;
 
-          const user = auth.currentUser;
-          if (!user) return;
+        try {
+          const cachedStr = await AsyncStorage.getItem("unifix_cached_user");
+          const cached = cachedStr ? JSON.parse(cachedStr) : null;
+          if (!cached) return;
 
-          try {
-            const snap = await getDoc(doc(db, "users", user.uid));
-            if (!snap.exists()) return;
+          const { role, verificationStatus } = cached;
 
-            const { role, verificationStatus } = snap.data();
-
-        if (role === "staff" && verificationStatus === "approved") {
-              if (data.complaintId) {
-                router.replace({
-                  pathname: "/staff-dashboard",
-                  params: { openComplaintId: data.complaintId },
-                } as any);
-              } else if (data.type === "new_lost_found") {
-                router.replace({
-                  pathname: "/staff-dashboard",
-                  params: { openTab: "lostfound", openLFTab: "feed" },
-                } as any);
-              } else if (data.type === "item_handed_over") {
-                router.replace({
-                  pathname: "/staff-dashboard",
-                  params: { openTab: "lostfound", openLFTab: "claims" },
-                } as any);
-              } else {
-                router.replace("/staff-dashboard" as any);
-              }
-         } else if (role === "admin") {
-              if (data.type === "new_staff_signup") {
-                // Small delay lets admin dashboard mount before pushing
-                setTimeout(() => router.push("/(admin)/MaintenanceScreen" as any), 100);
-              } else if (data.type === "new_security_issue") {
-                router.push("/(admin)/SecurityScreen" as any);
-              } else if (data.type === "new_deletion_request") {
-                router.push("/(admin)/DeletionsScreen" as any);
-              } else if (data.type === "new_idcard_request") {
-                router.push("/(admin)/IdCardsScreen" as any);
-              } else if (data.type === "complaint_escalated" || data.complaintId) {
-                router.push({
-                  pathname: "/admin-dashboard",
-                  params: { openTab: "complaints" },
-                } as any);
-              } else {
-                router.push("/admin-dashboard" as any);
-              }
+          if (role === "staff" && verificationStatus === "approved") {
+            if (data.complaintId) {
+              router.replace({
+                pathname: "/staff-dashboard",
+                params: { openComplaintId: data.complaintId },
+              } as any);
+            } else if (data.type === "new_lost_found") {
+              router.replace({
+                pathname: "/staff-dashboard",
+                params: { openTab: "lostfound", openLFTab: "feed" },
+              } as any);
+            } else if (data.type === "item_handed_over") {
+              router.replace({
+                pathname: "/staff-dashboard",
+                params: { openTab: "lostfound", openLFTab: "claims" },
+              } as any);
             } else {
-              if (
-                data.type === "complaint_completed" ||
-                data.type === "complaint_accepted" ||
-                data.type === "complaint_in_progress" ||
-                data.type === "complaint_rejected" ||
-                data.type === "complaint_escalated" ||
-                data.complaintId
-              ) {
-                router.push({
-                  pathname: "/",
-                  params: {
-                    openTab: "complaints",
-                    openComplaintId: data.complaintId || null,
-                  },
-                } as any);
-              } else if (
-                data.type === "new_lost_found" ||
-                data.type === "item_handed_over" ||
-                data.type === "new_lost_report" ||
-                data.type === "lost_report_found"
-              ) {
-                const lfTab =
-                  data.type === "new_lost_found"
-                    ? "feed"
-                    : data.type === "item_handed_over"
-                      ? "claims"
-                      : data.type === "new_lost_report"
-                        ? "lostreports"
-                        : "lost-history";
-                router.push({
-                  pathname: "/",
-                  params: { openTab: "lostfound", openLFTab: lfTab },
-                } as any);
-              } else {
-                router.push("/" as any);
-              }
+              router.replace("/staff-dashboard" as any);
             }
-          } catch {
-            router.push("/" as any);
+          } else if (role === "admin") {
+            if (data.type === "new_staff_signup") {
+              setTimeout(
+                () => router.push("/(admin)/MaintenanceScreen" as any),
+                100
+              );
+            } else if (data.type === "new_security_issue") {
+              router.push("/(admin)/SecurityScreen" as any);
+            } else if (data.type === "new_deletion_request") {
+              router.push("/(admin)/DeletionsScreen" as any);
+            } else if (data.type === "new_idcard_request") {
+              router.push("/(admin)/IdCardsScreen" as any);
+            } else if (
+              data.type === "complaint_escalated" ||
+              data.complaintId
+            ) {
+              router.push({
+                pathname: "/admin-dashboard",
+                params: { openTab: "complaints" },
+              } as any);
+            } else {
+              router.push("/admin-dashboard" as any);
+            }
+          } else {
+            if (
+              data.type === "complaint_completed" ||
+              data.type === "complaint_accepted" ||
+              data.type === "complaint_in_progress" ||
+              data.type === "complaint_rejected" ||
+              data.type === "complaint_escalated" ||
+              data.complaintId
+            ) {
+              router.push({
+                pathname: "/",
+                params: {
+                  openTab: "complaints",
+                  openComplaintId: data.complaintId || null,
+                },
+              } as any);
+            } else if (
+              data.type === "new_lost_found" ||
+              data.type === "item_handed_over" ||
+              data.type === "new_lost_report" ||
+              data.type === "lost_report_found"
+            ) {
+              const lfTab =
+                data.type === "new_lost_found"
+                  ? "feed"
+                  : data.type === "item_handed_over"
+                  ? "claims"
+                  : data.type === "new_lost_report"
+                  ? "lostreports"
+                  : "lost-history";
+              router.push({
+                pathname: "/",
+                params: { openTab: "lostfound", openLFTab: lfTab },
+              } as any);
+            } else {
+              router.push("/" as any);
+            }
           }
-        },
-      );
+        } catch {
+          router.push("/" as any);
+        }
+      });
 
     return () => {
-      if (authUnsubscribe) authUnsubscribe();
-      if (notificationListener.current) notificationListener.current.remove();
+      if (notificationListener.current)
+        notificationListener.current.remove();
       if (responseListener.current) responseListener.current.remove();
     };
   }, []);
 
-useEffect(() => {
-   setTimeout(() => setMinSplashDone(true), 200);
+  useEffect(() => {
+    setTimeout(() => setMinSplashDone(true), 200);
   }, []);
 
-  
   useEffect(() => {
     const originalHandler = ErrorUtils.getGlobalHandler();
     ErrorUtils.setGlobalHandler((error: any, isFatal?: boolean) => {
@@ -496,7 +490,8 @@ useEffect(() => {
       ErrorUtils.setGlobalHandler(originalHandler);
     };
   }, []);
-useEffect(() => {
+
+  useEffect(() => {
     if (appReady && initialRoute && minSplashDone && !hasNavigatedRef.current) {
       hasNavigatedRef.current = true;
       InteractionManager.runAfterInteractions(() => {
@@ -512,11 +507,11 @@ useEffect(() => {
     }
   }, [appReady, initialRoute, minSplashDone]);
 
-const [skeletonVisible, setSkeletonVisible] = useState(true);
+  const [skeletonVisible, setSkeletonVisible] = useState(true);
   const skeletonAnim = useRef(new Animated.Value(1)).current;
   const [overlayRole, setOverlayRole] = useState<string | null>(null);
 
-const showRoleOverlay = useCallback((role: string) => {
+  const showRoleOverlay = useCallback((role: string) => {
     setOverlayRole(role);
     setSkeletonVisible(true);
     skeletonAnim.setValue(1);
@@ -534,7 +529,7 @@ const showRoleOverlay = useCallback((role: string) => {
     (global as any).__unifixShowRoleOverlay = showRoleOverlay;
   }, [showRoleOverlay]);
 
-useEffect(() => {
+  useEffect(() => {
     if (appReady && minSplashDone && hasNavigatedRef.current) {
       setSkeletonVisible(false);
       skeletonAnim.setValue(0);
@@ -544,7 +539,8 @@ useEffect(() => {
   function getRoleSkeletonOrSplash() {
     if (cachedRole === "staff") return <StaffDashboardSkeleton />;
     if (cachedRole === "admin") return <AdminDashboardSkeleton />;
-    if (cachedRole === "student" || cachedRole === "teacher") return <DashboardSkeleton />;
+    if (cachedRole === "student" || cachedRole === "teacher")
+      return <DashboardSkeleton />;
     return <UnifixSplash />;
   }
 
@@ -554,13 +550,20 @@ useEffect(() => {
 
   return (
     <>
-<Stack screenOptions={{ headerShown: false }} initialRouteName={
-        initialRoute === "/admin-dashboard" ? "(admin)/admin-dashboard" :
-        initialRoute === "/staff-dashboard" ? "(staff)/staff-dashboard" :
-        initialRoute === "/login" ? "(auth)/login" :
-        initialRoute === "/complete-profile" ? "(auth)/complete-profile" :
-        "(student)/index"
-      }>
+      <Stack
+        screenOptions={{ headerShown: false }}
+        initialRouteName={
+          initialRoute === "/admin-dashboard"
+            ? "(admin)/admin-dashboard"
+            : initialRoute === "/staff-dashboard"
+            ? "(staff)/staff-dashboard"
+            : initialRoute === "/login"
+            ? "(auth)/login"
+            : initialRoute === "/complete-profile"
+            ? "(auth)/complete-profile"
+            : "(student)/index"
+        }
+      >
         <Stack.Screen name="(student)/index" />
         <Stack.Screen name="(auth)/login" />
         <Stack.Screen name="(auth)/signup" />
@@ -572,17 +575,23 @@ useEffect(() => {
         <Stack.Screen name="(student)/my-complaints" />
         <Stack.Screen name="(staff)/staff-dashboard" />
         <Stack.Screen name="(student)/report-ragging" />
-       <Stack.Screen name="(admin)/admin-dashboard" />
+        <Stack.Screen name="(admin)/admin-dashboard" />
         <Stack.Screen name="(admin)/MaintenanceScreen" />
         <Stack.Screen name="(admin)/StaffUsersScreen" />
         <Stack.Screen name="(admin)/IdCardsScreen" />
         <Stack.Screen name="(admin)/DeletionsScreen" />
         <Stack.Screen name="(admin)/SecurityScreen" />
-        <Stack.Screen name="legal/terms-and-conditions" options={{ headerShown: false }} />
-        <Stack.Screen name="(student)/modal" options={{ presentation: "modal" }} />
+        <Stack.Screen
+          name="legal/terms-and-conditions"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="(student)/modal"
+          options={{ presentation: "modal" }}
+        />
       </Stack>
-<Toast />
-{skeletonVisible && (
+      <Toast />
+      {skeletonVisible && (
         <Animated.View
           pointerEvents="none"
           style={[
